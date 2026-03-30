@@ -1,0 +1,36 @@
+# 환경변수 (비밀번호, API 키 포함)
+.env
+
+# 데이터베이스
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+manage_role.py
+parse_notion.py
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/.env*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 백업 파일 (iptables 방화벽 백업 등)
+backups/
+
+# 업로드 파일 (아바타 등 사용자 콘텐츠)
+uploads/
+
+# Claude
+.claude/

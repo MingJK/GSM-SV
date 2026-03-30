@@ -1,0 +1,12 @@
+fastapi[all]
+httpx
+proxmoxer
+requests
+pydantic-settings
+sqlalchemy
+psycopg2-binary
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+aiosmtplib
+python-multipart
