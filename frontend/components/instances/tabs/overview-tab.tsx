@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Cpu, HardDrive, MemoryStick, Clock, Monitor, Calendar, User, Lock, Copy, Key, Timer, Eye, EyeOff } from "lucide-react"
+import { Cpu, HardDrive, MemoryStick, Clock, Monitor, Calendar, User, Lock, Copy, Check, Key, Timer, Eye, EyeOff } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { Instance } from "@/lib/types"
@@ -16,6 +16,15 @@ export function OverviewTab({
   ports?: PortInfo[]
 }) {
   const [showPassword, setShowPassword] = useState(false)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  const handleCopy = (text: string, field: string) => {
+    navigator.clipboard.writeText(text)
+    setTimeout(() => {
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 1500)
+    }, 100)
+  }
   const createdDate = instance.created
     ? new Date(instance.created).toLocaleDateString("ko-KR", {
         year: "numeric",
@@ -105,10 +114,10 @@ export function OverviewTab({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6"
-                    onClick={() => navigator.clipboard.writeText(instance.vm_password!)}
+                    className="h-6 w-6 transition-all duration-150 active:scale-75 active:opacity-60"
+                    onClick={() => handleCopy(instance.vm_password!, "password")}
                   >
-                    <Copy className="h-3 w-3" />
+                    {copiedField === "password" ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
                   </Button>
                 </>
               )}
@@ -127,10 +136,10 @@ export function OverviewTab({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6"
-                  onClick={() => navigator.clipboard.writeText(instance.internal_ip!)}
+                  className="h-6 w-6 transition-all duration-150 active:scale-75 active:opacity-60"
+                  onClick={() => handleCopy(instance.internal_ip!, "ip")}
                 >
-                  <Copy className="h-3 w-3" />
+                  {copiedField === "ip" ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
                 </Button>
               )}
             </div>

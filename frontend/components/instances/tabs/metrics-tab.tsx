@@ -22,7 +22,7 @@ import type { Instance } from "@/lib/types"
 import { getVmMetrics, type VmMetricPoint } from "@/lib/api"
 import { useNotifications } from "@/lib/notification-context"
 
-const POLL_INTERVAL = 2000
+const POLL_INTERVAL = 10000
 
 // 시간 범위 → Proxmox timeframe 매핑
 const TIMEFRAME_MAP: Record<string, string> = {
