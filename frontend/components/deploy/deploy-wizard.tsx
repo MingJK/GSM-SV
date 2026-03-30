@@ -573,7 +573,7 @@ export function DeployWizard() {
                 <Input
                   id="hostname"
                   value={hostname}
-                  onChange={(e) => setHostname(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
+                  onChange={(e) => setHostname(e.target.value.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-]/g, ""))}
                   placeholder="미입력 시 자동 생성"
                 />
                 <p className="text-xs text-muted-foreground">영어, 숫자, 하이픈(-)만 사용 가능합니다.</p>

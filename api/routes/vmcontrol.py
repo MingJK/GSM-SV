@@ -159,7 +159,15 @@ async def get_my_vms(
     """현재 사용자가 소유한 모든 VM 목록 조회 (모든 노드 통합)"""
     user_vms = db.query(Vm).filter(Vm.owner_id == current_user.id).all()
 
+    # 서버별로 VM 그룹핑 → Proxmox 연결 재사용
+    from collections import defaultdict
+    server_vms: dict[int, list] = defaultdict(list)
+    for vm in user_vms:
+        server_vms[vm.server_id].append(vm)
+
     result = []
+    proxmox_cache: dict[int, any] = {}
+
     for vm in user_vms:
         info = {
             "vmid": vm.hypervisor_vmid,
@@ -171,7 +179,9 @@ async def get_my_vms(
             "expires_at": str(vm.expires_at) if vm.expires_at else None,
         }
         try:
-            proxmox = get_proxmox_for_server(vm.server)
+            if vm.server_id not in proxmox_cache:
+                proxmox_cache[vm.server_id] = get_proxmox_for_server(vm.server)
+            proxmox = proxmox_cache[vm.server_id]
             vm_status = proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).status.current.get()
             info["status"] = vm_status.get("status", "unknown")
             info["cpu_usage"] = vm_status.get("cpu", 0)
@@ -179,10 +189,9 @@ async def get_my_vms(
             info["mem_usage"] = vm_status.get("mem", 0)
             info["maxdisk"] = vm_status.get("maxdisk", 0)
             info["uptime"] = vm_status.get("uptime", 0)
-            # 부팅 후 5분 이내면 프로비저닝 중으로 간주
             uptime = vm_status.get("uptime", 0)
             info["provisioning"] = (
-                vm_status.get("status") == "running" and 0 < uptime < 300
+                vm_status.get("status") == "running" and 0 < uptime < 180
             )
         except Exception:
             pass
@@ -206,15 +215,16 @@ async def get_vm_status(
 
         # cloud-init 완료 여부 확인 (running 상태일 때만)
         provisioning = False
-        if vm_status.get("status") == "running":
+        uptime = vm_status.get("uptime", 0)
+        if vm_status.get("status") == "running" and 0 < uptime < 180:
+            # 부팅 10분 이내: guest agent로 ok.txt 확인 시도
             try:
-                # cloud-init 스니펫 마지막에 생성하는 ok.txt 파일로 확인
                 proxmox.nodes(node).qemu(vmid).agent("file-read").get(
                     file="/home/ubuntu/ok.txt"
                 )
-                # 파일을 읽을 수 있으면 초기 설정 완료
+                # 파일 있으면 설정 완료
             except Exception:
-                # 파일 없거나 guest agent 미응답 → 설정 중
+                # agent 미설치 또는 파일 미존재 → 설정 중
                 provisioning = True
 
         # Proxmox 실시간 데이터 + DB 저장 데이터 통합
