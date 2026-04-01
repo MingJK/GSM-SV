@@ -48,7 +48,9 @@ export function FirewallTab({
 
   // 새 규칙 폼 상태
   const [newProtocol, setNewProtocol] = useState("tcp")
-  const [newPort, setNewPort] = useState("22")
+  const [newPort, setNewPort] = useState("")
+  const [newSource, setNewSource] = useState("")
+  const [newAction, setNewAction] = useState("ACCEPT")
 
   const vmid = instance.vmid
 
@@ -69,18 +71,22 @@ export function FirewallTab({
   }, [fetchRules])
 
   const handleAdd = async () => {
+    if (!newPort) return
     setAdding(true)
     try {
       await addFirewallRule(vmid, {
-        action: "ACCEPT",
+        action: newAction,
         type: "in",
         proto: newProtocol,
         dport: newPort,
+        source: newSource || undefined,
         enable: 1,
       })
       await fetchRules()
       setNewProtocol("tcp")
-      setNewPort("22")
+      setNewPort("")
+      setNewSource("")
+      setNewAction("ACCEPT")
       setIsDialogOpen(false)
     } catch {
       // 에러 처리
@@ -148,7 +154,9 @@ export function FirewallTab({
           setIsDialogOpen(open)
           if (!open) {
             setNewProtocol("tcp")
-            setNewPort("22")
+            setNewPort("")
+            setNewSource("")
+            setNewAction("ACCEPT")
           }
         }}>
           <DialogTrigger asChild>
@@ -166,27 +174,52 @@ export function FirewallTab({
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium">프로토콜</label>
-                <Select value={newProtocol} onValueChange={setNewProtocol}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="프로토콜 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tcp">TCP</SelectItem>
-                    <SelectItem value="udp">UDP</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Source (출발지)</label>
+                <input
+                  type="text"
+                  value={newSource}
+                  onChange={(e) => setNewSource(e.target.value)}
+                  placeholder="0.0.0.0/0 (미입력 시 전체 허용)"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <p className="text-xs text-muted-foreground">예: 192.168.1.0/24, 10.0.0.1</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">프로토콜</label>
+                  <Select value={newProtocol} onValueChange={setNewProtocol}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="프로토콜 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tcp">TCP</SelectItem>
+                      <SelectItem value="udp">UDP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">포트</label>
+                  <Select value={newPort} onValueChange={setNewPort}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="포트 선택" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="22">22 (SSH)</SelectItem>
+                      <SelectItem value="80">80 (HTTP)</SelectItem>
+                      <SelectItem value="10000">10000 (SVC)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">포트</label>
-                <Select value={newPort} onValueChange={setNewPort}>
+                <label className="text-sm font-medium">동작</label>
+                <Select value={newAction} onValueChange={setNewAction}>
                   <SelectTrigger>
-                    <SelectValue placeholder="포트 선택" />
+                    <SelectValue placeholder="동작 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="22">22 (SSH)</SelectItem>
-                    <SelectItem value="80">80 (HTTP)</SelectItem>
-                    <SelectItem value="10000">10000 (SVC)</SelectItem>
+                    <SelectItem value="ACCEPT">허용 (ACCEPT)</SelectItem>
+                    <SelectItem value="DROP">차단 (DROP)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -195,7 +228,7 @@ export function FirewallTab({
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 취소
               </Button>
-              <Button onClick={handleAdd} disabled={adding}>
+              <Button onClick={handleAdd} disabled={adding || !newPort}>
                 {adding ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -229,27 +262,13 @@ export function FirewallTab({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* 기본 포트포워딩 규칙 (항상 표시) */}
-                {[
-                  { port: "22", label: "SSH" },
-                  { port: "80", label: "HTTP" },
-                  { port: "10000", label: "SVC" },
-                ].map((def) => (
-                  <TableRow key={`default-${def.port}`} className="text-muted-foreground">
-                    <TableCell className="font-mono text-sm">0.0.0.0/0</TableCell>
-                    <TableCell className="font-mono text-sm">TCP</TableCell>
-                    <TableCell className="font-mono text-sm">{def.port} ({def.label})</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="bg-[var(--status-active-bg)] text-[var(--status-active-fg)]">
-                        허용
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-muted-foreground">기본</span>
+                {rules.length === 0 && !loading && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      등록된 방화벽 규칙이 없습니다.
                     </TableCell>
                   </TableRow>
-                ))}
-                {/* 사용자 추가 규칙 */}
+                )}
                 {rules.map((rule) => (
                   <TableRow key={rule.pos}>
                     <TableCell className="font-mono text-sm">{rule.source || "0.0.0.0/0"}</TableCell>

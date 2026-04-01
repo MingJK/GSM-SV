@@ -1,0 +1,93 @@
+"use client"
+
+import { DocsLayout } from "@/components/docs/docs-layout"
+
+export default function SshKeyPage() {
+  return (
+    <DocsLayout>
+      <h1>SSH Key 등록</h1>
+
+      <h2>SSH Key란?</h2>
+      <p>
+        SSH Key는 비밀번호 대신 사용할 수 있는 안전한 인증 방식입니다.
+        공개키(Public Key)와 개인키(Private Key) 쌍으로 구성되며,
+        공개키를 VM에 등록하면 비밀번호 없이 SSH 접속이 가능합니다.
+      </p>
+
+      <h2>SSH Key 생성</h2>
+      <p>터미널(Windows는 PowerShell)에서 아래 명령어를 실행합니다.</p>
+      <pre><code>ssh-keygen -t ed25519</code></pre>
+      <blockquote>
+        <p>
+          <code>-C</code> 옵션으로 코멘트를 추가하면 여러 키를 구분하기 편합니다.{" "}
+          예: <code>ssh-keygen -t ed25519 -C "my-laptop"</code>
+        </p>
+      </blockquote>
+      <p>
+        저장 경로와 패스프레이즈를 입력합니다.
+        기본 경로를 사용하려면 Enter를 누르세요.
+      </p>
+
+      <h3>생성된 키 확인</h3>
+      <p>기본 경로에 두 개의 파일이 생성됩니다.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>파일</th>
+            <th>설명</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>~/.ssh/id_ed25519</code></td>
+            <td>개인키 (절대 공유하지 마세요)</td>
+          </tr>
+          <tr>
+            <td><code>~/.ssh/id_ed25519.pub</code></td>
+            <td>공개키 (VM에 등록할 키)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>공개키 복사</h2>
+      <p>공개키 내용을 클립보드에 복사합니다.</p>
+
+      <h3>Windows</h3>
+      <pre><code>Get-Content ~/.ssh/id_ed25519.pub | Set-Clipboard</code></pre>
+
+      <h3>macOS</h3>
+      <pre><code>cat ~/.ssh/id_ed25519.pub | pbcopy</code></pre>
+
+      <h3>Linux</h3>
+      <pre><code>cat ~/.ssh/id_ed25519.pub | xclip -selection clipboard</code></pre>
+
+      <h2>VM에 공개키 등록</h2>
+      <p>비밀번호로 VM에 먼저 접속한 뒤, 공개키를 등록합니다.</p>
+
+      <h3>1. VM에 SSH 접속</h3>
+      <pre><code>ssh ubuntu@192.168.0.100 -p &lt;SSH 포트&gt;</code></pre>
+
+      <h3>2. authorized_keys 파일에 공개키 추가</h3>
+      <pre><code>mkdir -p ~/.ssh && chmod 700 ~/.ssh{"\n"}echo "여기에_공개키_내용_붙여넣기" &gt;&gt; ~/.ssh/authorized_keys{"\n"}chmod 600 ~/.ssh/authorized_keys</code></pre>
+
+      <h3>3. 접속 테스트</h3>
+      <p>새 터미널을 열고 비밀번호 없이 접속되는지 확인합니다.</p>
+      <pre><code>ssh ubuntu@192.168.0.100 -p &lt;SSH 포트&gt;</code></pre>
+      <blockquote>
+        <p>비밀번호 입력 없이 바로 접속되면 SSH Key 등록이 완료된 것입니다.</p>
+      </blockquote>
+
+      <h2>비밀번호 인증 비활성화 (권장)</h2>
+      <p>
+        SSH Key 접속이 정상적으로 되는 것을 확인한 뒤, 비밀번호 인증을 비활성화하면 보안이 크게 강화됩니다.
+      </p>
+      <pre><code>sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config{"\n"}sudo systemctl restart sshd</code></pre>
+
+      <h2>주의 사항</h2>
+      <ul>
+        <li><strong>개인키는 절대 공유하지 마세요.</strong> 개인키가 유출되면 누구나 VM에 접속할 수 있습니다.</li>
+        <li>패스프레이즈를 설정하면 키가 유출되더라도 추가 보안이 제공됩니다.</li>
+      </ul>
+    </DocsLayout>
+  )
+}
