@@ -16,6 +16,8 @@ import {
   Zap,
   HardDrive,
   Terminal,
+  KeyRound,
+  Shield,
   FolderKanban,
   MessageCircleQuestion,
   MessageSquarePlus,
@@ -36,11 +38,19 @@ const mainNavItems: NavItemData[] = [
   { title: "VM 생성", href: "/deploy", icon: Rocket },
 ]
 
-// 문서 카테고리
-const docCategories: NavItemData[] = [
-  { title: "시작하기", href: "/docs/getting-started", icon: Zap },
-  { title: "인스턴스", href: "/docs/instances", icon: HardDrive },
-  { title: "접속 방법", href: "/docs/access", icon: Terminal },
+// 문서 카테고리 (하위 카테고리 지원)
+type DocCategory = NavItemData & { children?: NavItemData[] }
+
+const docCategories: DocCategory[] = [
+  {
+    title: "시작하기", href: "/docs/getting-started", icon: Zap,
+    children: [
+      { title: "인스턴스", href: "/docs/instances", icon: HardDrive },
+      { title: "접속 방법", href: "/docs/access", icon: Terminal },
+    ],
+  },
+  { title: "SSH Key 등록", href: "/docs/ssh-key", icon: KeyRound },
+  { title: "방화벽 설정", href: "/docs/firewall", icon: Shield },
   { title: "FAQ", href: "/docs/faq", icon: MessageCircleQuestion },
   { title: "질문 등록", href: "/docs/questions", icon: MessageSquarePlus },
 ]
@@ -325,37 +335,72 @@ export function Sidebar() {
                 {docCategories.map((cat, idx) => {
                   const Icon = cat.icon
                   const active = isItemActive(cat.href)
+                  const childActive = cat.children?.some((c) => isItemActive(c.href)) ?? false
                   const isLast = idx === docCategories.length - 1
                   return (
                     <div key={cat.href} className="relative flex">
-                      {/* 세로선 + 가로 브랜치 */}
+                      {/* 메인 세로선 (children 포함 전체 높이) */}
                       <div className="relative w-5 shrink-0">
-                        {/* 세로선: 마지막이 아니면 전체, 마지막이면 절반만 */}
                         <div
                           className="absolute left-0 w-px bg-sidebar-border"
-                          style={{
-                            top: 0,
-                            height: isLast ? "50%" : "100%",
-                          }}
+                          style={{ top: 0, height: isLast ? "18px" : "100%" }}
                         />
-                        {/* 가로 브랜치 */}
+                        {/* 가로 브랜치 — 링크 첫 행 중앙 */}
                         <div
-                          className="absolute left-0 top-1/2 h-px bg-sidebar-border"
-                          style={{ width: "100%" }}
+                          className="absolute left-0 h-px bg-sidebar-border"
+                          style={{ top: 18, width: "100%" }}
                         />
                       </div>
-                      <Link
-                        href={cat.href}
-                        className={cn(
-                          "flex flex-1 items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-md transition-all duration-200",
-                          active
-                            ? "bg-sidebar-accent text-sidebar-foreground font-medium"
-                            : "text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          href={cat.href}
+                          className={cn(
+                            "flex items-center gap-2.5 px-2.5 py-2 text-[13px] rounded-md transition-all duration-200",
+                            active || childActive
+                              ? "bg-sidebar-accent text-sidebar-foreground font-medium"
+                              : "text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                          )}
+                        >
+                          <Icon className={cn("h-4 w-4 shrink-0 transition-colors", active || childActive ? "text-white" : "")} />
+                          <span>{cat.title}</span>
+                        </Link>
+                        {/* 하위 카테고리 */}
+                        {cat.children && (
+                          <div className="ml-3">
+                            {cat.children.map((child, childIdx) => {
+                              const ChildIcon = child.icon
+                              const childIsActive = isItemActive(child.href)
+                              const isChildLast = childIdx === cat.children!.length - 1
+                              return (
+                                <div key={child.href} className="relative flex">
+                                  <div className="relative w-5 shrink-0">
+                                    <div
+                                      className="absolute left-0 w-px bg-sidebar-border"
+                                      style={{ top: 0, height: isChildLast ? "50%" : "100%" }}
+                                    />
+                                    <div
+                                      className="absolute left-0 top-1/2 h-px bg-sidebar-border"
+                                      style={{ width: "100%" }}
+                                    />
+                                  </div>
+                                  <Link
+                                    href={child.href}
+                                    className={cn(
+                                      "flex flex-1 items-center gap-2.5 px-2.5 py-1.5 text-[12px] rounded-md transition-all duration-200",
+                                      childIsActive
+                                        ? "bg-sidebar-accent text-sidebar-foreground font-medium"
+                                        : "text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                                    )}
+                                  >
+                                    <ChildIcon className={cn("h-3.5 w-3.5 shrink-0 transition-colors", childIsActive ? "text-white" : "")} />
+                                    <span>{child.title}</span>
+                                  </Link>
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
-                      >
-                        <Icon className={cn("h-4 w-4 shrink-0 transition-colors", active ? "text-white" : "")} />
-                        <span>{cat.title}</span>
-                      </Link>
+                      </div>
                     </div>
                   )
                 })}

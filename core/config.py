@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "VM Control Platform"
     API_V1_STR: str = "/api/v1"
     
-    # 데이터베이스 접속 URL (PostgreSQL 권장, SQLite 호환)
-    DATABASE_URL: str = "postgresql://gsmsv:gsmsv@localhost:5432/gsmsv"
+    # 데이터베이스 접속 URL (PostgreSQL 권장, SQLite 호환) — .env에서 설정
+    DATABASE_URL: str = "sqlite:///./vm_console.db"
 
     # 보안 설정 (JWT) — .env에 반드시 설정 필요
     SECRET_KEY: str = ""

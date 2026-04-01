@@ -109,7 +109,7 @@ runcmd:
   - ip link set dev eth0 mtu 1400
   - netplan apply
   - echo "root:{root_password}" | chpasswd
-  - echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+  - echo -e "PasswordAuthentication yes\\nPermitRootLogin no" > /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
   - systemctl restart ssh
   - apt update
   - apt install -y qemu-guest-agent

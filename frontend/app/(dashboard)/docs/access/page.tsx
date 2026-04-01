@@ -42,9 +42,9 @@ export default function AccessPage() {
       </p>
 
       <h2>SSH 접속</h2>
-      <pre><code>ssh ubuntu@172.10.104.3 -p &lt;SSH 포트&gt;</code></pre>
+      <pre><code>ssh ubuntu@192.168.0.100 -p &lt;SSH 포트&gt;</code></pre>
       <ul>
-        <li>호스트: <code>172.10.104.3</code></li>
+        <li>호스트: <code>192.168.0.100</code></li>
         <li>포트: 인스턴스 상세 페이지의 SSH 포트</li>
         <li>계정: <code>ubuntu</code></li>
         <li>비밀번호: 인스턴스 상세 페이지에서 확인 (초기 비밀번호)</li>
@@ -52,7 +52,7 @@ export default function AccessPage() {
 
       <h3>예시</h3>
       <p>인스턴스 상세 페이지에서 SSH 포트가 <code>10101</code>로 표시된 경우:</p>
-      <pre><code>ssh ubuntu@172.10.104.3 -p 10101</code></pre>
+      <pre><code>ssh ubuntu@192.168.0.100 -p 10101</code></pre>
       <p>접속 후 비밀번호를 변경하는 것을 권장합니다.</p>
       <pre><code>passwd</code></pre>
 
@@ -60,7 +60,7 @@ export default function AccessPage() {
       <p>
         VM에서 80번 포트로 서비스를 실행하면, 외부에서는 할당된 HTTP 포트로 접근할 수 있습니다.
       </p>
-      <pre><code>http://172.10.104.3:&lt;HTTP 포트&gt;</code></pre>
+      <pre><code>http://192.168.0.100:&lt;HTTP 포트&gt;</code></pre>
 
       <h2>SVC 포트 활용</h2>
       <p>
