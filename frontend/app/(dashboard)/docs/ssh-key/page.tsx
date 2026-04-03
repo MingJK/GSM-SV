@@ -85,7 +85,7 @@ export default function SshKeyPage() {
       <p>
         SSH Key 접속이 정상적으로 되는 것을 확인한 뒤, 비밀번호 인증을 비활성화하면 보안이 크게 강화됩니다.
       </p>
-      <pre><code>sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config{"\n"}sudo systemctl restart sshd</code></pre>
+      <pre><code>sudo sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config.d/60-cloudimg-settings.conf{"\n"}sudo systemctl restart sshd</code></pre>
 
       <h2>주의 사항</h2>
       <ul>

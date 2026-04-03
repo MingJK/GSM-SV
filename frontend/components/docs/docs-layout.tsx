@@ -41,7 +41,8 @@ export function DocsLayout({ children }: { children: React.ReactNode }) {
           prose-li:text-sm prose-li:text-muted-foreground
           prose-strong:text-foreground
           prose-code:text-sm prose-code:bg-muted prose-code:text-foreground prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:font-mono
-          prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-lg
+          prose-pre:bg-muted prose-pre:text-foreground prose-pre:border prose-pre:border-border prose-pre:rounded-lg prose-pre:px-4 prose-pre:py-3
+          [&_pre_code]:p-0 [&_pre_code]:bg-transparent [&_pre_code]:border-0
           prose-table:text-sm
           prose-th:text-left prose-th:font-semibold prose-th:px-4 prose-th:py-2.5 prose-th:bg-muted prose-th:border-b prose-th:border-border
           prose-td:px-4 prose-td:py-2.5 prose-td:border-b prose-td:border-border/50
