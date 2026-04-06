@@ -10,4 +10,7 @@ passlib[bcrypt]
 python-jose[cryptography]
 aiosmtplib
 python-multipart
+slowapi
+paramiko
+cryptography
 pytest

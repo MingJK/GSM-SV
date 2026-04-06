@@ -212,7 +212,7 @@ async def exchange_temp_code(body: TokenExchangeRequest):
     if not entry or entry["expires"] < time.time():
         raise HTTPException(status_code=400, detail="유효하지 않거나 만료된 코드입니다.")
 
-    is_prod = "localhost" not in settings.FRONTEND_URL
+    is_prod = settings.FRONTEND_URL.startswith("https")
     response = JSONResponse(content={"message": "ok"})
     response.set_cookie(
         key="access_token",
