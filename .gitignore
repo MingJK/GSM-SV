@@ -32,5 +32,13 @@ backups/
 # 업로드 파일 (아바타 등 사용자 콘텐츠)
 uploads/
 
+# Docker
+Dockerfile
+frontend/Dockerfile
+docker-compose.yml
+.dockerignore
+frontend/.dockerignore
+nginx/
+
 # Claude
 .claude/

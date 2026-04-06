@@ -43,7 +43,7 @@ from fastapi.responses import JSONResponse
 
 def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str):
     """httpOnly 쿠키에 JWT 토큰을 설정합니다."""
-    is_prod = "localhost" not in settings.FRONTEND_URL
+    is_prod = settings.FRONTEND_URL.startswith("https")
     response.set_cookie(
         key="access_token",
         value=access_token,
