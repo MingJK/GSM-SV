@@ -69,14 +69,14 @@ export default function SshKeyPage() {
       <p>비밀번호로 VM에 먼저 접속한 뒤, 공개키를 등록합니다.</p>
 
       <h3>1. VM에 SSH 접속</h3>
-      <pre><code>ssh ubuntu@192.168.0.100 -p &lt;SSH 포트&gt;</code></pre>
+      <pre><code>ssh ubuntu@ssh.gsmsv.site -p &lt;SSH 포트&gt;</code></pre>
 
       <h3>2. authorized_keys 파일에 공개키 추가</h3>
       <pre><code>mkdir -p ~/.ssh && chmod 700 ~/.ssh{"\n"}echo "여기에_공개키_내용_붙여넣기" &gt;&gt; ~/.ssh/authorized_keys{"\n"}chmod 600 ~/.ssh/authorized_keys</code></pre>
 
       <h3>3. 접속 테스트</h3>
       <p>새 터미널을 열고 비밀번호 없이 접속되는지 확인합니다.</p>
-      <pre><code>ssh -i ~/.ssh/id_ed25519_gsmsv ubuntu@192.168.0.100 -p &lt;SSH 포트&gt;</code></pre>
+      <pre><code>ssh -i ~/.ssh/id_ed25519_gsmsv ubuntu@ssh.gsmsv.site -p &lt;SSH 포트&gt;</code></pre>
       <blockquote>
         <p>비밀번호 입력 없이 바로 접속되면 SSH Key 등록이 완료된 것입니다.</p>
       </blockquote>
