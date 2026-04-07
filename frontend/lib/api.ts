@@ -255,7 +255,7 @@ export interface VmInfo {
 
 export interface VmCreateRequest {
   tier: "micro" | "small" | "medium" | "large" | "project_custom";
-  os: "ubuntu2204" | "windows-server";
+  os: "ubuntu2204";
   node_name?: string;
   name?: string;
   custom_cores?: number;

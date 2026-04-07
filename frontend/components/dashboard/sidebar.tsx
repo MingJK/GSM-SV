@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
+import gsmsvLogo from "@/public/gsmsv_logo.jpg"
 import { cn } from "@/lib/utils"
 import {
   Server,
@@ -273,9 +275,7 @@ export function Sidebar() {
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2.5 px-4 mt-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-800 dark:bg-neutral-600">
-            <LayoutDashboard className="h-4.5 w-4.5 text-white" />
-          </div>
+          <Image src={gsmsvLogo} alt="GSMSV" width={36} height={36} className="rounded-xl dark:invert" />
           <span className="text-base font-semibold text-sidebar-foreground">
             GSM SV
           </span>

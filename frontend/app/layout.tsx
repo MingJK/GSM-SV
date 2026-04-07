@@ -23,8 +23,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'GSM SV - Cloud Dashboard',
-  description: 'Manage your virtual machines and cloud infrastructure',
+  title: 'GSMSV',
+  description: '광주소프트웨어마이스터고등학교 교내 클라우드 플랫폼',
   generator: 'GSM SV Team',
   icons: {
     icon: [
