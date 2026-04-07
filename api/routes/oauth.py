@@ -93,7 +93,7 @@ async def oauth_callback(
     if not verifier:
         raise HTTPException(status_code=400, detail="유효하지 않은 state입니다. 다시 로그인해주세요.")
 
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         # 2. Authorization Code → Access Token 교환
         token_res = await client.post(
             f"{settings.DATAGSM_OAUTH_URL}/v1/oauth/token",
