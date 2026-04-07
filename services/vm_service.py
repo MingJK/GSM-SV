@@ -109,7 +109,7 @@ runcmd:
   - ip link set dev eth0 mtu 1400
   - netplan apply
   - echo "root:{root_password}" | chpasswd
-  - echo -e "PasswordAuthentication yes\\nPermitRootLogin no\\nMaxAuthTries 5" > /etc/ssh/sshd_config.d/99-gsmsv.conf
+  - printf "PasswordAuthentication yes\\nPermitRootLogin no\\nMaxAuthTries 5\\n" > /etc/ssh/sshd_config.d/99-gsmsv.conf
   - systemctl restart ssh
   - apt update
   - apt install -y qemu-guest-agent
