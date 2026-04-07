@@ -76,7 +76,7 @@ function LoginContent() {
           <div className="text-center space-y-1">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">로그인</h1>
             <p className="text-sm text-muted-foreground">
-              DataGSM 계정으로 로그인하세요
+              GSMSV 계정으로 로그인하세요
             </p>
           </div>
         </div>
