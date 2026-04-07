@@ -97,19 +97,20 @@ export function InstanceHeader({ instance }: { instance: Instance }) {
   }
 
   const handleAction = async (action: string) => {
+    if (actionLoading) return
     setActionLoading(true)
     try {
       await controlVm(instance.node, instance.vmid, action)
-      // 페이지 새로고침으로 상태 갱신
-      setTimeout(() => window.location.reload(), 2000)
+      // 액션별 쿨다운: reboot 30초, 나머지 5초 후 새로고침
+      const cooldown = action === "reboot" ? 30000 : 5000
+      setTimeout(() => window.location.reload(), cooldown)
     } catch {
-      // 에러 처리
-    } finally {
       setActionLoading(false)
     }
   }
 
   const handleDelete = async () => {
+    if (actionLoading) return
     setActionLoading(true)
     setDeleteOpen(false)
     try {

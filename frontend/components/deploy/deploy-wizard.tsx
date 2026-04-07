@@ -45,13 +45,6 @@ const osOptions = [
     icon: "/os_ubuntu.png",
     tag: "추천",
   },
-  {
-    id: "windows-server",
-    name: "Windows Server",
-    desc: "Windows 기반 서버 환경",
-    icon: "/os_windows.png",
-    tag: null,
-  },
 ]
 
 const nodeOptions = [
@@ -160,7 +153,7 @@ export function DeployWizard() {
     try {
       const res = await createVm({
         tier: selectedTier as "micro" | "small" | "medium" | "large" | "project_custom",
-        os: selectedOs as "ubuntu2204" | "windows-server",
+        os: selectedOs as "ubuntu2204",
         node_name: selectedNode,
         name: hostname || undefined,
         ...(isCustomTier && {
