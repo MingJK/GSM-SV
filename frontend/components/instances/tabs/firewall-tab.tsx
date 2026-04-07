@@ -118,7 +118,7 @@ export function FirewallTab({
               외부 접속 포트
             </CardTitle>
             <CardDescription>
-              포트포워딩이 설정된 서비스 목록입니다. 도메인은 추후 설정됩니다.
+              포트포워딩이 설정된 서비스 목록입니다.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -126,13 +126,13 @@ export function FirewallTab({
               <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
                 <div className="space-y-0.5">
                   <p className="text-xs text-muted-foreground font-medium">{port.service}</p>
-                  <p className="font-mono text-sm font-bold">:{port.public_port}</p>
+                  <p className="font-mono text-sm font-bold">ssh.gsmsv.site:{port.public_port}</p>
                 </div>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => navigator.clipboard.writeText(String(port.public_port))}
+                  onClick={() => navigator.clipboard.writeText(`ssh.gsmsv.site:${port.public_port}`)}
                 >
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
