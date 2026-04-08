@@ -44,7 +44,7 @@ async def lookup_student_by_email(email: str) -> dict | None:
 
         if resp.status_code != 200:
             logger.error(f"DataGSM Students API 오류: {resp.status_code} - {resp.text}")
-            return None
+            raise RuntimeError("DataGSM API 오류")
 
         data = resp.json()
         students = data.get("data", {}).get("students", [])
@@ -63,10 +63,12 @@ async def lookup_student_by_email(email: str) -> dict | None:
 
     except httpx.TimeoutException:
         logger.error("DataGSM Students API 요청 타임아웃")
-        return None
+        raise RuntimeError("DataGSM API 타임아웃")
+    except RuntimeError:
+        raise
     except Exception as e:
         logger.error(f"DataGSM Students API 호출 실패: {e}")
-        return None
+        raise RuntimeError("DataGSM API 호출 실패")
 
 
 async def lookup_projects_by_email(email: str) -> list[dict]:

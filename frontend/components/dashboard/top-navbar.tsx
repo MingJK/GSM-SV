@@ -100,7 +100,7 @@ export function TopNavbar() {
           onKeyDown={(e) => {
             if (e.key === "Escape") setShowResults(false)
             if (e.key === "Enter" && filtered.length === 1) {
-              router.push(`/instances/${filtered[0].node}/${filtered[0].vmid}`)
+              router.push(`/instances/${filtered[0].vmid}?node=${filtered[0].node}`)
               setShowResults(false)
               setQuery("")
             }
@@ -119,7 +119,7 @@ export function TopNavbar() {
                   key={`${vm.node}-${vm.vmid}`}
                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent transition-colors"
                   onClick={() => {
-                    router.push(`/instances/${vm.node}/${vm.vmid}`)
+                    router.push(`/instances/${vm.vmid}?node=${vm.node}`)
                     setShowResults(false)
                     setQuery("")
                   }}

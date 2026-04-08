@@ -89,7 +89,13 @@ async def signup(request: Request, user_in: UserCreate, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="이미 일반 계정으로 가입된 이메일입니다.")
 
     # DataGSM API로 재학생 검증
-    student_info = await lookup_student_by_email(user_in.email)
+    try:
+        student_info = await lookup_student_by_email(user_in.email)
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="서버 오류입니다. 잠시 후 다시 시도해주세요.",
+        )
     if student_info is None:
         raise HTTPException(
             status_code=403,
@@ -140,7 +146,13 @@ async def check_project_eligibility(body: ProjectCheckRequest, db: Session = Dep
         raise HTTPException(status_code=400, detail="이미 프로젝트 오너로 가입된 이메일입니다.")
 
     # 재학생 검증
-    student_info = await lookup_student_by_email(body.email)
+    try:
+        student_info = await lookup_student_by_email(body.email)
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="서버 오류입니다. 잠시 후 다시 시도해주세요.",
+        )
     if student_info is None:
         raise HTTPException(
             status_code=403,
@@ -209,7 +221,13 @@ async def signup_project(body: ProjectSignupRequest, db: Session = Depends(get_d
         )
 
     # 재학생 + 프로젝트 참여 재확인
-    student_info = await lookup_student_by_email(body.email)
+    try:
+        student_info = await lookup_student_by_email(body.email)
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="서버 오류입니다. 잠시 후 다시 시도해주세요.",
+        )
     if student_info is None:
         raise HTTPException(status_code=403, detail="재학생 검증에 실패했습니다.")
 
