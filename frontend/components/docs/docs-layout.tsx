@@ -2,14 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Zap, HardDrive, Terminal, KeyRound, Shield, MessageCircleQuestion, MessageSquarePlus, ChevronRight } from "lucide-react"
+import { Zap, HardDrive, Terminal, KeyRound, MessageCircleQuestion, MessageSquarePlus, ChevronRight } from "lucide-react"
 
 const sideNav = [
   { title: "시작하기", href: "/docs/getting-started", icon: Zap },
   { title: "인스턴스", href: "/docs/instances", icon: HardDrive },
   { title: "접속 방법", href: "/docs/access", icon: Terminal },
   { title: "SSH Key 등록", href: "/docs/ssh-key", icon: KeyRound },
-  { title: "방화벽 설정", href: "/docs/firewall", icon: Shield },
   { title: "FAQ", href: "/docs/faq", icon: MessageCircleQuestion },
   { title: "질문 등록", href: "/docs/questions", icon: MessageSquarePlus },
 ]

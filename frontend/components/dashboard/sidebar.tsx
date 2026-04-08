@@ -19,7 +19,6 @@ import {
   HardDrive,
   Terminal,
   KeyRound,
-  Shield,
   FolderKanban,
   MessageCircleQuestion,
   MessageSquarePlus,
@@ -52,7 +51,6 @@ const docCategories: DocCategory[] = [
     ],
   },
   { title: "SSH Key 등록", href: "/docs/ssh-key", icon: KeyRound },
-  { title: "방화벽 설정", href: "/docs/firewall", icon: Shield },
   { title: "FAQ", href: "/docs/faq", icon: MessageCircleQuestion },
   { title: "질문 등록", href: "/docs/questions", icon: MessageSquarePlus },
 ]
