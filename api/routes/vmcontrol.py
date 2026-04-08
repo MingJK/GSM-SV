@@ -207,7 +207,7 @@ async def get_vm_status(
     current_user: User = Depends(get_current_user),
 ):
     """특정 VM의 상세 상태 조회 (소유자 또는 관리자만 가능)"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     proxmox = get_proxmox_for_server(vm_record.server)
 
     try:
@@ -263,7 +263,7 @@ async def get_vm_metrics(
     timeframe: hour | day (1h → hour, 6h/24h → day)
     """
     logger.info(f"[metrics] 요청: node={node}, vmid={vmid}, timeframe={timeframe}")
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     proxmox = get_proxmox_for_server(vm_record.server)
 
     if timeframe not in ("hour", "day"):
@@ -315,7 +315,7 @@ async def resize_vm(
     if current_user.role not in (UserRole.ADMIN, UserRole.PROJECT_OWNER):
         raise HTTPException(status_code=403, detail="프로젝트 오너 또는 관리자만 사양을 변경할 수 있습니다.")
 
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     server = vm_record.server
     proxmox = get_proxmox_for_server(server)
 
@@ -374,7 +374,7 @@ async def extend_vm(
     current_user: User = Depends(get_current_user),
 ):
     """VM 만료 기간을 30일 연장합니다. 만료 15일 전부터 가능."""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
 
     if not vm_record.expires_at:
         raise HTTPException(status_code=400, detail="만료 기한이 없는 VM입니다.")
@@ -409,7 +409,7 @@ async def control_vm(
     current_user: User = Depends(get_current_user),
 ):
     """VM 전원 제어 (시작/중지/재시작) — 소유자 또는 관리자만 가능"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     proxmox = get_proxmox_for_server(vm_record.server)
 
     try:
@@ -465,7 +465,7 @@ async def list_snapshots(
     current_user: User = Depends(get_current_user),
 ):
     """VM 스냅샷 목록 조회"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     proxmox = get_proxmox_for_server(vm_record.server)
     try:
         snapshots = proxmox.nodes(node).qemu(vmid).snapshot.get()
@@ -485,7 +485,7 @@ async def create_snapshot(
     current_user: User = Depends(get_current_user),
 ):
     """VM 스냅샷 생성 (최대 3개)"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     proxmox = get_proxmox_for_server(vm_record.server)
 
     snap_name = body.get("name", "").strip()
@@ -527,7 +527,7 @@ async def rollback_snapshot(
     current_user: User = Depends(get_current_user),
 ):
     """VM을 특정 스냅샷 시점으로 복원"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     proxmox = get_proxmox_for_server(vm_record.server)
     try:
         result = proxmox.nodes(node).qemu(vmid).snapshot(snapname).rollback.post()
@@ -546,7 +546,7 @@ async def delete_snapshot(
     current_user: User = Depends(get_current_user),
 ):
     """VM 스냅샷 삭제"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     proxmox = get_proxmox_for_server(vm_record.server)
     try:
         result = proxmox.nodes(node).qemu(vmid).snapshot(snapname).delete()
@@ -564,7 +564,7 @@ async def get_auto_snapshot(
     current_user: User = Depends(get_current_user),
 ):
     """자동 스냅샷 설정 조회"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     return {"enabled": bool(vm_record.auto_snapshot)}
 
 
@@ -576,7 +576,7 @@ async def toggle_auto_snapshot(
     current_user: User = Depends(get_current_user),
 ):
     """자동 스냅샷 ON/OFF 토글"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     vm_record.auto_snapshot = not vm_record.auto_snapshot
     db.commit()
     return {"enabled": bool(vm_record.auto_snapshot)}
@@ -593,5 +593,5 @@ async def delete_vm_endpoint(
     current_user: User = Depends(get_current_user),
 ):
     """VM 삭제 — 소유자 또는 관리자만 가능"""
-    vm_record = get_vm_with_owner_check(db, vmid, current_user)
+    vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
     return delete_vm(db=db, vm_record=vm_record, purge=purge)
