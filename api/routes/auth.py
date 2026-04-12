@@ -693,9 +693,18 @@ async def change_password(
 
 AVATAR_DIR = Path("uploads/avatars")
 AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+AVATAR_DIR_RESOLVED = AVATAR_DIR.resolve()
 ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
 ALLOWED_AVATAR_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
+
+
+def _safe_avatar_path(avatar_url: str) -> Path | None:
+    """avatar_url을 안전한 로컬 경로로 변환. AVATAR_DIR 외부 경로는 None 반환."""
+    resolved = Path(avatar_url.lstrip("/")).resolve()
+    if not str(resolved).startswith(str(AVATAR_DIR_RESOLVED)):
+        return None
+    return resolved
 
 
 @router.post("/avatar")
@@ -712,10 +721,10 @@ async def upload_avatar(
     if len(contents) > MAX_AVATAR_SIZE:
         raise HTTPException(status_code=400, detail="파일 크기는 2MB 이하여야 합니다.")
 
-    # 기존 아바타 삭제
+    # 기존 아바타 삭제 (경로 순회 방지)
     if current_user.avatar_url:
-        old_path = Path(current_user.avatar_url.lstrip("/"))
-        if old_path.exists():
+        old_path = _safe_avatar_path(current_user.avatar_url)
+        if old_path and old_path.exists():
             old_path.unlink(missing_ok=True)
 
     # 저장 (확장자 화이트리스트)
@@ -742,8 +751,8 @@ async def delete_avatar(
 ):
     """프로필 사진 삭제"""
     if current_user.avatar_url:
-        old_path = Path(current_user.avatar_url.lstrip("/"))
-        if old_path.exists():
+        old_path = _safe_avatar_path(current_user.avatar_url)
+        if old_path and old_path.exists():
             old_path.unlink(missing_ok=True)
 
     current_user.avatar_url = None
