@@ -168,17 +168,50 @@ def _delete_snippet(server: Server, filename: str):
         ssh.close()
 
 
-def _wait_for_clone(proxmox, node_name: str, vmid: int, timeout: int = 60):
-    """클론 태스크가 완료될 때까지 대기합니다."""
+def _wait_for_clone(proxmox, node_name: str, vmid: int, timeout: int = 120, upid: str = None):
+    """클론 태스크가 완료될 때까지 대기합니다.
+
+    upid가 주어지면 Proxmox 태스크 상태를 직접 폴링합니다.
+    태스크 완료 후 lock 해제까지 추가 대기합니다.
+    """
     deadline = time.time() + timeout
+    delay = 1
+
+    # ── UPID 기반 태스크 완료 대기 ──
+    if upid:
+        while time.time() < deadline:
+            try:
+                task = proxmox.nodes(node_name).tasks(upid).status.get()
+                task_status = task.get("status", "")
+                if task_status == "stopped":
+                    exit_status = task.get("exitstatus", "")
+                    if exit_status != "OK":
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"VM {vmid} 클론 실패: {exit_status}",
+                        )
+                    break  # 태스크 완료 → lock 해제 대기로 진행
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+            time.sleep(min(delay, max(0, deadline - time.time())))
+            delay = min(delay * 2, 5)
+        else:
+            raise HTTPException(status_code=500, detail=f"VM {vmid} 클론 타임아웃 ({timeout}초)")
+
+    # ── lock 해제 대기 (클론 완료 후에도 잠시 lock이 남을 수 있음) ──
+    delay = 0.5
     while time.time() < deadline:
         try:
-            # VM config를 읽을 수 있으면 클론 완료
-            proxmox.nodes(node_name).qemu(vmid).config.get()
-            return
+            config = proxmox.nodes(node_name).qemu(vmid).config.get()
+            if not config.get("lock"):
+                return  # lock 해제됨 → 안전하게 후속 작업 가능
         except Exception:
-            time.sleep(2)
-    raise HTTPException(status_code=500, detail=f"VM {vmid} 클론 타임아웃 ({timeout}초)")
+            pass
+        time.sleep(min(delay, max(0, deadline - time.time())))
+        delay = min(delay * 2, 3)
+    raise HTTPException(status_code=500, detail=f"VM {vmid} lock 해제 타임아웃 ({timeout}초)")
 
 
 # ── VM 생성 ─────────────────────────────────────────────────
@@ -296,15 +329,15 @@ def create_vm(
 
     try:
         # 5. 템플릿 Full Clone
-        proxmox.nodes(server.name).qemu(template_vmid).clone.post(
+        clone_upid = proxmox.nodes(server.name).qemu(template_vmid).clone.post(
             newid=vmid,
             name=vm_name,
             full=1,                     # full clone (linked clone이 아닌 독립 디스크)
             target=server.name,
         )
 
-        # 클론 완료 대기
-        _wait_for_clone(proxmox, server.name, vmid)
+        # 클론 태스크 완료 + lock 해제 대기
+        _wait_for_clone(proxmox, server.name, vmid, upid=clone_upid)
 
         # 6. Cloud-Init 설정 주입 (VM별 동적 스니펫)
         #    템플릿에는 cicustom 없음 → 클론 후 동적 스니펫 생성 → cicustom user= 적용
@@ -409,7 +442,19 @@ def create_vm(
     except Exception as e:
         # 실패 시 생성된 VM + 스니펫 정리 시도
         try:
-            proxmox.nodes(server.name).qemu(vmid).delete()
+            # lock이 남아있으면 삭제 불가 → lock 해제까지 대기 후 삭제
+            for _ in range(10):
+                try:
+                    config = proxmox.nodes(server.name).qemu(vmid).config.get()
+                    if config.get("lock"):
+                        logger.info(f"VM {vmid} lock 대기 중 (정리 전)...")
+                        time.sleep(3)
+                        continue
+                except Exception:
+                    time.sleep(3)
+                    continue
+                break
+            proxmox.nodes(server.name).qemu(vmid).delete(purge=1)
         except Exception:
             logger.warning(f"VM {vmid} 생성 실패 후 정리 중 오류 (수동 확인 필요)")
         try:
