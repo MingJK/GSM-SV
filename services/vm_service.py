@@ -1,4 +1,5 @@
 import logging
+import re
 import string
 import secrets
 import time
@@ -33,15 +34,25 @@ def _generate_password(length: int = 8) -> str:
     return password
 
 
+def _sanitize_dns_name(name: str) -> str:
+    """문자열을 DNS 호환 이름으로 변환 (소문자 + 숫자 + 하이픈만 허용)"""
+    name = name.lower()
+    name = re.sub(r"[^a-z0-9-]", "-", name)  # 허용되지 않는 문자 → 하이픈
+    name = re.sub(r"-+", "-", name)           # 연속 하이픈 제거
+    name = name.strip("-")                    # 앞뒤 하이픈 제거
+    return name
+
+
 def _generate_vm_name(user: User, tier: str, custom_name: str = None) -> tuple[str, str]:
     """
     VM 이름 생성 → (proxmox_name, display_name) 튜플 반환
     - custom_name이 있으면: test1-myvm / myvm
     - 없으면 자동 생성:    test1-micro-a3f2 / micro-a3f2
     """
-    username = user.email.split("@")[0]
+    username = _sanitize_dns_name(user.email.split("@")[0])
     if custom_name:
-        return f"{username}-{custom_name}", custom_name
+        safe_name = _sanitize_dns_name(custom_name)
+        return f"{username}-{safe_name}", custom_name
     suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(4))
     short = f"{tier}-{suffix}"
     return f"{username}-{short}", short
