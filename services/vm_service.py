@@ -40,7 +40,7 @@ def _sanitize_dns_name(name: str) -> str:
     name = re.sub(r"[^a-z0-9-]", "-", name)  # 허용되지 않는 문자 → 하이픈
     name = re.sub(r"-+", "-", name)           # 연속 하이픈 제거
     name = name.strip("-")                    # 앞뒤 하이픈 제거
-    return name
+    return name or "vm"                       # 빈 문자열 방지 (비ASCII 이메일 등)
 
 
 def _generate_vm_name(user: User, tier: str, custom_name: str = None) -> tuple[str, str]:
@@ -338,6 +338,7 @@ def create_vm(
     vmid = _get_next_vmid(proxmox, server.name)
     vm_name, vm_display_name = _generate_vm_name(current_user, tier.value, custom_name=name)
     vm_password = _generate_password()
+    clone_started = False  # clone 시작 여부 추적
 
     try:
         # 5. 템플릿 Full Clone
@@ -347,6 +348,7 @@ def create_vm(
             full=1,                     # full clone (linked clone이 아닌 독립 디스크)
             target=server.name,
         )
+        clone_started = True
 
         # 클론 태스크 완료 + lock 해제 대기
         _wait_for_clone(proxmox, server.name, vmid, upid=clone_upid)
@@ -453,22 +455,23 @@ def create_vm(
         raise
     except Exception as e:
         # 실패 시 생성된 VM + 스니펫 정리 시도
-        try:
-            # lock이 남아있으면 삭제 불가 → lock 해제까지 대기 후 삭제
-            for _ in range(10):
-                try:
-                    config = proxmox.nodes(server.name).qemu(vmid).config.get()
-                    if config.get("lock"):
-                        logger.info(f"VM {vmid} lock 대기 중 (정리 전)...")
+        if clone_started:
+            try:
+                # lock이 남아있으면 삭제 불가 → lock 해제까지 대기 후 삭제
+                for _ in range(10):
+                    try:
+                        config = proxmox.nodes(server.name).qemu(vmid).config.get()
+                        if config.get("lock"):
+                            logger.info(f"VM {vmid} lock 대기 중 (정리 전)...")
+                            time.sleep(3)
+                            continue
+                    except Exception:
                         time.sleep(3)
                         continue
-                except Exception:
-                    time.sleep(3)
-                    continue
-                break
-            proxmox.nodes(server.name).qemu(vmid).delete(purge=1)
-        except Exception:
-            logger.warning(f"VM {vmid} 생성 실패 후 정리 중 오류 (수동 확인 필요)")
+                    break
+                proxmox.nodes(server.name).qemu(vmid).delete(purge=1)
+            except Exception:
+                logger.warning(f"VM {vmid} 생성 실패 후 정리 중 오류 (수동 확인 필요)")
         try:
             _delete_snippet(server, f"user-data-{vmid}.yaml")
         except Exception:
