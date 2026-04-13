@@ -24,10 +24,10 @@ class Vm(Base):
     display_name = Column(String, nullable=True)
     
     # 생성된 VM이 실제로 위치한 물리 서버 ID (servers 테이블 참조)
-    server_id = Column(Integer, ForeignKey("servers.id"), nullable=False)
-    
+    server_id = Column(Integer, ForeignKey("servers.id"), nullable=False, index=True)
+
     # 신규: VM 소유자(사용자) ID 기록
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     
     # 할당된 자원
     allocated_ram_mb = Column(Integer, default=2048)
