@@ -135,6 +135,7 @@ def _upload_snippet(server: Server, filename: str, content: str):
             timeout=10,
         )
         sftp = ssh.open_sftp()
+        sftp.get_channel().settimeout(15)  # SFTP 작업 타임아웃
         remote_path = f"{SNIPPETS_DIR}/{filename}"
         with sftp.file(remote_path, "w") as f:
             f.write(content)

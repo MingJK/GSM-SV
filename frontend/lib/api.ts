@@ -13,6 +13,7 @@ const API_BASE = "/api/v1";
 let refreshPromise: Promise<boolean> | null = null;
 
 async function refreshAccessToken(): Promise<boolean> {
+  // 이미 진행 중인 갱신이 있으면 그 결과를 대기 (중복 호출 방지)
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -26,12 +27,15 @@ async function refreshAccessToken(): Promise<boolean> {
       return res.ok;
     } catch {
       return false;
-    } finally {
-      refreshPromise = null;
     }
   })();
 
-  return refreshPromise;
+  try {
+    return await refreshPromise;
+  } finally {
+    // 모든 대기자가 결과를 받은 후에 리셋
+    refreshPromise = null;
+  }
 }
 
 // ── 범용 fetch 래퍼 ─────────────────────────────────────────
