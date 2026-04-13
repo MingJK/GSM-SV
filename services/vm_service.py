@@ -135,6 +135,7 @@ def _upload_snippet(server: Server, filename: str, content: str):
             timeout=10,
         )
         sftp = ssh.open_sftp()
+        sftp.get_channel().settimeout(15)  # SFTP 작업 타임아웃
         remote_path = f"{SNIPPETS_DIR}/{filename}"
         with sftp.file(remote_path, "w") as f:
             f.write(content)
@@ -169,15 +170,17 @@ def _delete_snippet(server: Server, filename: str):
 
 
 def _wait_for_clone(proxmox, node_name: str, vmid: int, timeout: int = 60):
-    """클론 태스크가 완료될 때까지 대기합니다."""
+    """클론 태스크가 완료될 때까지 지수 백오프로 대기합니다."""
     deadline = time.time() + timeout
+    delay = 0.5
     while time.time() < deadline:
         try:
             # VM config를 읽을 수 있으면 클론 완료
             proxmox.nodes(node_name).qemu(vmid).config.get()
             return
         except Exception:
-            time.sleep(2)
+            time.sleep(min(delay, max(0, deadline - time.time())))
+            delay = min(delay * 2, 5)  # 0.5 → 1 → 2 → 4 → 5(max)
     raise HTTPException(status_code=500, detail=f"VM {vmid} 클론 타임아웃 ({timeout}초)")
 
 

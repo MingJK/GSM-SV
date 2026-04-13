@@ -208,6 +208,7 @@ async def get_vm_status(
 ):
     """특정 VM의 상세 상태 조회 (소유자 또는 관리자만 가능)"""
     vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
+    node = vm_record.server.name  # URL 파라미터 대신 DB 값 사용 (IDOR 방지)
     proxmox = get_proxmox_for_server(vm_record.server)
 
     try:
@@ -262,8 +263,9 @@ async def get_vm_metrics(
     VM 실시간 메트릭 조회 (Proxmox rrddata).
     timeframe: hour | day (1h → hour, 6h/24h → day)
     """
-    logger.info(f"[metrics] 요청: node={node}, vmid={vmid}, timeframe={timeframe}")
     vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
+    node = vm_record.server.name
+    logger.info(f"[metrics] 요청: node={node}, vmid={vmid}, timeframe={timeframe}")
     proxmox = get_proxmox_for_server(vm_record.server)
 
     if timeframe not in ("hour", "day"):
@@ -410,6 +412,7 @@ async def control_vm(
 ):
     """VM 전원 제어 (시작/중지/재시작) — 소유자 또는 관리자만 가능"""
     vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
+    node = vm_record.server.name
     proxmox = get_proxmox_for_server(vm_record.server)
 
     try:
@@ -466,6 +469,7 @@ async def list_snapshots(
 ):
     """VM 스냅샷 목록 조회"""
     vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
+    node = vm_record.server.name
     proxmox = get_proxmox_for_server(vm_record.server)
     try:
         snapshots = proxmox.nodes(node).qemu(vmid).snapshot.get()
@@ -486,6 +490,7 @@ async def create_snapshot(
 ):
     """VM 스냅샷 생성 (최대 3개)"""
     vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
+    node = vm_record.server.name
     proxmox = get_proxmox_for_server(vm_record.server)
 
     snap_name = body.get("name", "").strip()
@@ -528,6 +533,7 @@ async def rollback_snapshot(
 ):
     """VM을 특정 스냅샷 시점으로 복원"""
     vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
+    node = vm_record.server.name
     proxmox = get_proxmox_for_server(vm_record.server)
     try:
         result = proxmox.nodes(node).qemu(vmid).snapshot(snapname).rollback.post()
@@ -547,6 +553,7 @@ async def delete_snapshot(
 ):
     """VM 스냅샷 삭제"""
     vm_record = get_vm_with_owner_check(db, vmid, current_user, node)
+    node = vm_record.server.name
     proxmox = get_proxmox_for_server(vm_record.server)
     try:
         result = proxmox.nodes(node).qemu(vmid).snapshot(snapname).delete()
