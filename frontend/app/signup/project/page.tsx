@@ -43,11 +43,13 @@ export default function ProjectSignupPage() {
   const [error, setError] = useState("")
 
   const passwordChecks = [
-    { label: "6자 이상", pass: password.length >= 6 },
+    { label: "8자 이상", pass: password.length >= 8 },
     { label: "영문 포함", pass: /[a-zA-Z]/.test(password) },
     { label: "숫자 포함", pass: /\d/.test(password) },
+    { label: "특수문자 포함", pass: /[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/~`]/.test(password) },
   ]
   const passwordStrength = passwordChecks.filter((c) => c.pass).length
+  const passwordTotal = passwordChecks.length
 
   const handleCheckEmail = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,7 +90,7 @@ export default function ProjectSignupPage() {
       setError("비밀번호가 일치하지 않습니다.")
       return
     }
-    if (passwordStrength < 3) {
+    if (passwordStrength < passwordTotal) {
       setError("비밀번호 조건을 모두 충족해주세요.")
       return
     }
@@ -343,16 +345,16 @@ export default function ProjectSignupPage() {
                 {password.length > 0 && (
                   <div className="space-y-2 pt-1">
                     <div className="flex gap-1.5">
-                      {[1, 2, 3].map((level) => (
+                      {Array.from({ length: passwordTotal }, (_, i) => i + 1).map((level) => (
                         <div
                           key={level}
                           className="h-1 flex-1 rounded-full transition-colors"
                           style={{
                             background:
                               passwordStrength >= level
-                                ? passwordStrength === 3
+                                ? passwordStrength === passwordTotal
                                   ? "var(--status-active-dot)"
-                                  : passwordStrength === 2
+                                  : passwordStrength >= passwordTotal - 1
                                   ? "var(--status-pending-dot)"
                                   : "var(--status-error-dot)"
                                 : "var(--muted)",

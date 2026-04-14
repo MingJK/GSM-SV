@@ -280,7 +280,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav ref={navContainerRef} className="relative flex-1 overflow-hidden py-4">
+        <nav ref={navContainerRef} className="relative flex-1 overflow-y-auto overflow-x-hidden py-4 sidebar-scroll">
           <SlidingIndicator style={indicator} />
 
           {/* 메뉴 */}
