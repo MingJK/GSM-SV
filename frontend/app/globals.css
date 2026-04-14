@@ -175,26 +175,12 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-/* 사이드바 스크롤바 */
+/* 사이드바 스크롤바 숨김 (스크롤은 가능) */
 .sidebar-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-.sidebar-scroll:hover {
-  scrollbar-color: var(--muted-foreground) transparent;
+  scrollbar-width: none;
 }
 .sidebar-scroll::-webkit-scrollbar {
-  width: 4px;
-}
-.sidebar-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 4px;
-}
-.sidebar-scroll:hover::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
+  display: none;
 }
 
 @layer base {
