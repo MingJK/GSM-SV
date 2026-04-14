@@ -208,6 +208,8 @@ export function Sidebar() {
 
   const isItemActive = (href: string) => {
     if (href === "#") return false
+    // /instances는 VM 상세(/instances/123)와 겹치지 않도록 정확 매칭만
+    if (href === "/instances") return pathname === "/instances"
     return pathname === href || pathname.startsWith(href + "/")
   }
 
@@ -476,6 +478,7 @@ export function Sidebar() {
                               >
                                 <Link
                                   href={`${href}?node=${vm.node}`}
+                                  title={`${vm.name}${vm.owner_email ? ` (${vm.owner_email.split("@")[0]})` : ""}`}
                                   className={cn(
                                     "flex items-center gap-3 pl-10 pr-3 py-2 text-[13px] font-medium rounded-lg transition-all duration-200 z-[1] relative",
                                     active
