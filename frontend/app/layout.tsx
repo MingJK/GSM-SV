@@ -27,7 +27,8 @@ export const metadata: Metadata = {
   description: '광주소프트웨어마이스터고등학교 교내 클라우드 플랫폼',
   generator: 'GSM SV Team',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/icon.png',
+    apple: '/apple-icon.png',
   },
 }
 
