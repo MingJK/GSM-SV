@@ -23,6 +23,7 @@ import {
   MessageCircleQuestion,
   MessageSquarePlus,
   ChevronDown,
+  UserCheck,
 } from "lucide-react"
 import { getMyVms, getAllVms, type VmInfo, type AdminNodeVms } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
@@ -216,6 +217,7 @@ export function Sidebar() {
     : vms.map((vm) => `/instances/${vm.vmid}`)
   const indicatorHrefs = [
     ...mainNavItems.map((i) => i.href),
+    ...(isAdmin ? ["/admin/approvals"] : []),
     ...allVmHrefs,
   ]
   const activeHref = indicatorHrefs.find((href) => isItemActive(href))
@@ -405,6 +407,22 @@ export function Sidebar() {
               </div>
             </div>
           </div>
+
+          {/* 어드민: 승인 관리 */}
+          {isAdmin && (
+            <div className="mb-6">
+              <p className="mb-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Admin
+              </p>
+              <div className="space-y-0.5">
+                <NavItem
+                  item={{ title: "가입 승인", href: "/admin/approvals", icon: UserCheck }}
+                  isActive={isItemActive("/admin/approvals")}
+                  itemRef={getItemRef("/admin/approvals")}
+                />
+              </div>
+            </div>
+          )}
 
           {/* 어드민: NODES / 일반: MY VM */}
           {isAdmin ? (
