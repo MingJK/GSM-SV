@@ -82,8 +82,8 @@ export default function SettingsPage() {
       setError("모든 항목을 입력해주세요.")
       return
     }
-    if (newPassword.length < 6) {
-      setError("새 비밀번호는 6자 이상이어야 합니다.")
+    if (newPassword.length < 8 || !/[a-zA-Z]/.test(newPassword) || !/\d/.test(newPassword) || !/[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/~`]/.test(newPassword)) {
+      setError("비밀번호는 8자 이상, 영문+숫자+특수문자를 포함해야 합니다.")
       return
     }
     if (newPassword !== confirmPassword) {
@@ -271,7 +271,7 @@ export default function SettingsPage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="새 비밀번호 입력 (6자 이상)"
+                placeholder="새 비밀번호 입력 (8자 이상, 영문+숫자+특수문자)"
               />
             </div>
             <div className="space-y-2">
