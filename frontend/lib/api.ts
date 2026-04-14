@@ -239,6 +239,32 @@ export async function logout() {
   await api("/auth/logout", { method: "POST" }).catch(() => {});
 }
 
+// ── 어드민: 프로젝트 오너 승인 ──────────────────────────────
+
+export interface PendingApproval {
+  id: number;
+  email: string;
+  name?: string;
+  grade?: number;
+  class_num?: number;
+  number?: number;
+  major?: string;
+  project_name?: string;
+  project_reason?: string;
+}
+
+export async function getPendingApprovals(): Promise<PendingApproval[]> {
+  return api<PendingApproval[]>("/auth/pending-approvals");
+}
+
+export async function approveProjectOwner(userId: number): Promise<{ message: string }> {
+  return api<{ message: string }>(`/auth/approve/${userId}`, { method: "POST" });
+}
+
+export async function rejectProjectOwner(userId: number): Promise<{ message: string }> {
+  return api<{ message: string }>(`/auth/reject/${userId}`, { method: "POST" });
+}
+
 // ── VM API ──────────────────────────────────────────────────
 
 export interface VmInfo {
