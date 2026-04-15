@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import gsmsvLogo from "@/public/gsmsv_logo.jpg"
 import { cn } from "@/lib/utils"
 import {
@@ -155,6 +155,8 @@ function VmStatusDot({ status }: { status: string }) {
 
 export function Sidebar() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentNode = searchParams.get("node")
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
 
@@ -214,15 +216,22 @@ export function Sidebar() {
   }
 
   // 인디케이터 대상: 메인 메뉴 + VM 목록만 (문서는 제외)
-  const allVmHrefs = isAdmin
-    ? adminNodes.flatMap((n) => n.vms.map((vm) => `/instances/${vm.vmid}`))
+  // 어드민은 node:vmid 조합으로 고유 식별 (같은 vmid가 다른 노드에 존재 가능)
+  const allVmKeys = isAdmin
+    ? adminNodes.flatMap((n) => n.vms.map((vm) => `${n.name}:/instances/${vm.vmid}`))
     : vms.map((vm) => `/instances/${vm.vmid}`)
   const indicatorHrefs = [
     ...mainNavItems.map((i) => i.href),
     ...(isAdmin ? ["/admin/approvals"] : []),
-    ...allVmHrefs,
+    ...allVmKeys,
   ]
-  const activeHref = indicatorHrefs.find((href) => isItemActive(href))
+  const activeHref = indicatorHrefs.find((key) => {
+    if (key.includes(":/instances/")) {
+      const [node, href] = key.split(":")
+      return isItemActive(href) && currentNode === node
+    }
+    return isItemActive(key)
+  })
 
   // 인디케이터 위치 계산
   const updateIndicator = useCallback(() => {
@@ -252,7 +261,7 @@ export function Sidebar() {
 
   useLayoutEffect(() => {
     updateIndicator()
-  }, [updateIndicator, pathname, vms])
+  }, [updateIndicator, pathname, vms, adminNodes, currentNode, expandedNodes])
 
   useEffect(() => {
     window.addEventListener("resize", updateIndicator)
@@ -469,11 +478,12 @@ export function Sidebar() {
                         ) : (
                           node.vms.map((vm) => {
                             const href = `/instances/${vm.vmid}`
-                            const active = pathname === href || pathname.startsWith(href + "/")
+                            const vmKey = `${vm.node}:${href}`
+                            const active = (pathname === href || pathname.startsWith(href + "/")) && currentNode === vm.node
                             return (
                               <div
                                 key={`${vm.node}-${vm.vmid}`}
-                                ref={getItemRef(href)}
+                                ref={getItemRef(vmKey)}
                                 className="relative"
                               >
                                 <Link
