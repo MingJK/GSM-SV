@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { Suspense, useEffect } from "react"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { TopNavbar } from "@/components/dashboard/top-navbar"
 import { NotificationProvider, useNotifications } from "@/lib/notification-context"
@@ -31,7 +31,9 @@ export default function DashboardLayout({
     <NotificationProvider>
       <SessionNotificationHandler />
       <div className="min-h-screen bg-sidebar">
-        <Sidebar />
+        <Suspense fallback={<aside className="fixed left-0 top-0 z-40 h-screen w-52 bg-sidebar" />}>
+          <Sidebar />
+        </Suspense>
         <div className="pl-52">
           <div className="min-h-screen bg-background rounded-tl-2xl">
             <TopNavbar />
