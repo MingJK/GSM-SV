@@ -42,4 +42,4 @@ nginx/
 
 # Claude
 .claude/
-docs/
+/docs/
