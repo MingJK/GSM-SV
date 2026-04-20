@@ -131,13 +131,13 @@ export function InstanceHeader({ instance }: { instance: Instance }) {
         인스턴스 목록으로 돌아가기
       </Link>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary">
             <Server className="h-6 w-6 text-muted-foreground" />
           </div>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-semibold tracking-tight">
                 {instance.name}
               </h1>
@@ -170,7 +170,7 @@ export function InstanceHeader({ instance }: { instance: Instance }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {expiresAt && (
             <Button
               variant="outline"

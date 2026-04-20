@@ -10,7 +10,6 @@ SQLite → PostgreSQL 데이터 마이그레이션 스크립트
   - 양쪽 SECRET_KEY가 동일해야 암호화 필드 이식 가능
   - 기존 PostgreSQL 데이터는 모두 삭제됩니다 (테이블 TRUNCATE)
 """
-import os
 import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

@@ -1,6 +1,6 @@
+import sys
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 
 class Settings(BaseSettings):
     """
@@ -132,8 +132,6 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # 필수 환경변수 검증 — 누락 시 서버 시작 차단
-import sys
-
 if not settings.SECRET_KEY or settings.SECRET_KEY == "your-super-secret-key-change-this-in-production":
     print("❌ [FATAL] SECRET_KEY가 설정되지 않았습니다. .env 파일에 SECRET_KEY를 설정해주세요.")
     print("   예: SECRET_KEY=$(python -c \"import secrets; print(secrets.token_urlsafe(64))\")")
