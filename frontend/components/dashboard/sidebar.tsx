@@ -19,6 +19,7 @@ import {
   HardDrive,
   Terminal,
   KeyRound,
+  Cpu,
   FolderKanban,
   MessageCircleQuestion,
   MessageSquarePlus,
@@ -49,9 +50,10 @@ const docCategories: DocCategory[] = [
     children: [
       { title: "인스턴스", href: "/docs/instances", icon: HardDrive },
       { title: "접속 방법", href: "/docs/access", icon: Terminal },
+      { title: "SSH Key 등록", href: "/docs/ssh-key", icon: KeyRound },
+      { title: "Public IP / GPU 안내", href: "/docs/advanced-resources", icon: Cpu },
     ],
   },
-  { title: "SSH Key 등록", href: "/docs/ssh-key", icon: KeyRound },
   { title: "FAQ", href: "/docs/faq", icon: MessageCircleQuestion },
   { title: "질문 등록", href: "/docs/questions", icon: MessageSquarePlus },
 ]
@@ -253,7 +255,7 @@ export function Sidebar() {
     if (elRect.height === 0) return
 
     setIndicator({
-      top: elRect.top - containerRect.top,
+      top: elRect.top - containerRect.top + container.scrollTop,
       height: elRect.height,
       visible: true,
     })
