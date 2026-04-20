@@ -1,8 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Globe, Copy } from "lucide-react"
+import { Globe, Copy, Check } from "lucide-react"
 
 import type { Instance } from "@/lib/types"
 import { type PortInfo } from "@/lib/api"
@@ -14,6 +15,16 @@ export function FirewallTab({
   instance: Instance
   ports?: PortInfo[]
 }) {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+
+  const handleCopy = (text: string, index: number) => {
+    navigator.clipboard.writeText(text)
+    setTimeout(() => {
+      setCopiedIndex(index)
+      setTimeout(() => setCopiedIndex(null), 1500)
+    }, 100)
+  }
+
   return (
     <div className="space-y-6">
       {ports.length > 0 ? (
@@ -38,9 +49,12 @@ export function FirewallTab({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => navigator.clipboard.writeText(`ssh.gsmsv.site:${port.public_port}`)}
+                  onClick={() => handleCopy(`ssh.gsmsv.site:${port.public_port}`, i)}
                 >
-                  <Copy className="h-3.5 w-3.5" />
+                  {copiedIndex === i
+                    ? <Check className="h-3.5 w-3.5 text-emerald-500" />
+                    : <Copy className="h-3.5 w-3.5" />
+                  }
                 </Button>
               </div>
             ))}
