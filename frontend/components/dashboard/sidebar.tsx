@@ -140,8 +140,8 @@ function VmStatusDot({ status }: { status: string }) {
     status === "running"
       ? "bg-[var(--status-active-dot)]"
       : status === "stopped"
-      ? "bg-[var(--status-stopped-dot)]"
-      : "bg-[var(--status-pending-dot)]"
+        ? "bg-[var(--status-stopped-dot)]"
+        : "bg-[var(--status-pending-dot)]"
 
   return (
     <span
