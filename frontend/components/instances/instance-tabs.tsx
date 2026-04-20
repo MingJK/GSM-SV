@@ -20,7 +20,7 @@ export function InstanceTabs({
 }) {
   return (
     <Tabs defaultValue="overview" className="w-full">
-      <TabsList className="h-11 w-full justify-start rounded-none border-b border-border bg-transparent p-0">
+      <TabsList className="h-11 w-full justify-start rounded-none border-b border-border bg-transparent p-0 overflow-x-auto">
         <TabsTrigger value="overview" className={tabTriggerClass}>
           개요
         </TabsTrigger>

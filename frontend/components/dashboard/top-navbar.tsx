@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { Bell, Moon, Sun, Search, User, ChevronDown, LogOut, Inbox, Trash2, Settings, Monitor } from "lucide-react"
+import { Bell, Moon, Sun, Search, User, ChevronDown, LogOut, Inbox, Trash2, Settings, Monitor, Menu } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useNotifications, getNotificationColor } from "@/lib/notification-context"
@@ -32,7 +32,7 @@ function formatTimeAgo(date: Date): string {
   return `${Math.floor(diff / 86400)}일 전`
 }
 
-export function TopNavbar() {
+export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { theme, setTheme } = useTheme()
   const { user, logout } = useAuth()
   const { notifications, hasUnread, removeNotification, markAsRead, deleteAll } = useNotifications()
@@ -87,9 +87,16 @@ export function TopNavbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* Search */}
-      <div ref={searchRef} className="relative w-[24rem]">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 md:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* 모바일 햄버거 + 검색 */}
+      <div className="flex items-center gap-2 md:hidden">
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onMenuClick}>
+          <Menu className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* Search (데스크톱) */}
+      <div ref={searchRef} className="relative hidden md:block w-[24rem]">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
