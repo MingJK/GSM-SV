@@ -263,7 +263,9 @@ export function Sidebar() {
 
   useLayoutEffect(() => {
     updateIndicator()
-  }, [updateIndicator, pathname, vms, adminNodes, currentNode, expandedNodes])
+    const timer = setTimeout(updateIndicator, 310)
+    return () => clearTimeout(timer)
+  }, [updateIndicator, pathname, vms, adminNodes, currentNode, expandedNodes, docsOpen])
 
   useEffect(() => {
     window.addEventListener("resize", updateIndicator)
