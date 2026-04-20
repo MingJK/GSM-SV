@@ -38,7 +38,7 @@ export default function AdvancedResourcesPage() {
 
       <h2>신청 방법</h2>
       <p>
-        관리자에게 직접 문의하면 사용 사유를 검토한 후 제공드립니다.
+        관리자에게 직접 문의하면 사용 사유를 검토한 후 제공드립니다. <br />
         Discord ming._.jun으로 연락해주시거나 웹 문의를 통해 신청해주시면 감사하겠습니다.
       </p>
     </DocsLayout>
