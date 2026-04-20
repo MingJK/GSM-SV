@@ -263,9 +263,20 @@ export function Sidebar() {
   }, [activeHref])
 
   useLayoutEffect(() => {
-    updateIndicator()
-    const timer = setTimeout(updateIndicator, 310)
-    return () => clearTimeout(timer)
+    let rafId: number
+    let startTime: number | null = null
+    const duration = 320
+
+    const loop = (time: number) => {
+      if (startTime === null) startTime = time
+      updateIndicator()
+      if (time - startTime < duration) {
+        rafId = requestAnimationFrame(loop)
+      }
+    }
+
+    rafId = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(rafId)
   }, [updateIndicator, pathname, vms, adminNodes, currentNode, expandedNodes, docsOpen])
 
   useEffect(() => {
