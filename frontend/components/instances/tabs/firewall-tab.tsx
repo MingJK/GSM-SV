@@ -30,9 +30,9 @@ export function FirewallTab({
           <CardContent className="space-y-3">
             {ports.map((port, i) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
-                <div className="space-y-0.5">
+                <div className="min-w-0 space-y-0.5">
                   <p className="text-xs text-muted-foreground font-medium">{port.service}</p>
-                  <p className="font-mono text-sm font-bold">ssh.gsmsv.site:{port.public_port}</p>
+                  <p className="font-mono text-sm font-bold break-all">ssh.gsmsv.site:{port.public_port}</p>
                 </div>
                 <Button
                   variant="ghost"

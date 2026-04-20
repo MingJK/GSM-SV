@@ -193,7 +193,7 @@ export function DeployWizard() {
         <CardContent className="space-y-6">
           <div className="rounded-lg border p-4 space-y-3">
             <h4 className="font-semibold">접속 정보</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">노드</p>
                 <p className="font-mono font-medium">{result.assigned_node}</p>
@@ -238,8 +238,8 @@ export function DeployWizard() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      {/* Steps Sidebar */}
-      <Card className="lg:col-span-1 h-fit">
+      {/* Steps Sidebar — 모바일 숨김 */}
+      <Card className="hidden lg:block lg:col-span-1 h-fit">
         <CardContent className="p-4">
           <nav className="space-y-1">
             {steps.map((step) => {
@@ -576,7 +576,7 @@ export function DeployWizard() {
 
               <div className="space-y-3">
                 <h4 className="font-medium">구성 요약</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div className="space-y-1">
                     <p className="text-muted-foreground">운영체제</p>
                     <p className="font-medium">{selectedOsData?.name}</p>

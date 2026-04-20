@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { getMyVms, getAllVms, type VmInfo, type AdminNodeVms } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
+import { Sheet, SheetContent } from "@/components/ui/sheet"
 
 type NavItemData = {
   title: string
@@ -156,7 +157,13 @@ function VmStatusDot({ status }: { status: string }) {
 
 // ── Sidebar 본체 ─────────────────────────────────────────────
 
-export function Sidebar() {
+export function Sidebar({
+  mobileOpen = false,
+  onMobileClose,
+}: {
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+}) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentNode = searchParams.get("node")
@@ -306,9 +313,8 @@ export function Sidebar() {
 
   const isDocsActive = pathname.startsWith("/docs")
 
-  return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-52 bg-sidebar">
-      <div className="flex h-full flex-col">
+  const sidebarInner = (
+    <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2.5 px-4 mt-3">
           <Image src={gsmsvLogo} alt="GSMSV" width={36} height={36} className="rounded-xl dark:invert" />
@@ -617,7 +623,19 @@ export function Sidebar() {
             })}
           </div>
         </div>
-      </div>
-    </aside>
+    </div>
+  )
+
+  return (
+    <>
+      <aside className="fixed left-0 top-0 z-40 h-screen w-52 bg-sidebar hidden md:block">
+        {sidebarInner}
+      </aside>
+      <Sheet open={mobileOpen} onOpenChange={(open) => !open && onMobileClose?.()}>
+        <SheetContent side="left" className="w-52 p-0 bg-sidebar border-r border-sidebar-border [&>button]:hidden">
+          {sidebarInner}
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }

@@ -213,7 +213,7 @@ export function MetricsTab({ instance }: { instance: Instance }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           {latest && (
             <div className="flex gap-6 text-sm">
@@ -227,7 +227,7 @@ export function MetricsTab({ instance }: { instance: Instance }) {
           )}
         </div>
         <Select value={range} onValueChange={setRange}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="기간 선택" />
           </SelectTrigger>
           <SelectContent>
