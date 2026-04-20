@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from core.timezone import now_kst
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from sqlalchemy.orm import Session
@@ -331,7 +331,6 @@ async def resize_vm(
         raise HTTPException(status_code=400, detail="변경할 값이 없습니다.")
 
     update_params = {}
-    max_vcpus = 8
     max_memory = 32768  # 32GB
 
     if body.cores is not None:
