@@ -81,7 +81,7 @@ function SlidingIndicator({ style }: { style: IndicatorStyle }) {
       style={{
         top: style.top,
         height: style.height,
-        transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease",
+        transition: "top 0.15s cubic-bezier(0.4, 0, 0.2, 1), height 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease",
         opacity: style.visible ? 1 : 0,
         width: "calc(100% - 8px)",
         marginLeft: "8px",
@@ -243,6 +243,15 @@ export function Sidebar() {
       return
     }
 
+    // 접힌 노드 안의 VM이면 숨김
+    if (activeHref.includes(":/instances/")) {
+      const [node] = activeHref.split(":")
+      if (!expandedNodes.has(node)) {
+        setIndicator((prev) => ({ ...prev, visible: false }))
+        return
+      }
+    }
+
     const el = itemRefs.current.get(activeHref)
     if (!el) {
       setIndicator((prev) => ({ ...prev, visible: false }))
@@ -260,7 +269,7 @@ export function Sidebar() {
       height: elRect.height,
       visible: true,
     })
-  }, [activeHref])
+  }, [activeHref, expandedNodes])
 
   useLayoutEffect(() => {
     let rafId: number
