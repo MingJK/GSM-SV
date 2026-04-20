@@ -253,7 +253,7 @@ export function Sidebar() {
     if (elRect.height === 0) return
 
     setIndicator({
-      top: elRect.top - containerRect.top,
+      top: elRect.top - containerRect.top + container.scrollTop,
       height: elRect.height,
       visible: true,
     })
