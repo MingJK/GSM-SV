@@ -31,6 +31,7 @@ import { useAuth } from "@/lib/auth-context"
 
 type NavItemData = {
   title: string
+  label?: React.ReactNode
   href: string
   icon: React.ComponentType<{ className?: string }>
   external?: boolean
@@ -50,7 +51,7 @@ const docCategories: DocCategory[] = [
     children: [
       { title: "인스턴스", href: "/docs/instances", icon: HardDrive },
       { title: "접속 방법", href: "/docs/access", icon: Terminal },
-      { title: "SSH Key 등록", href: "/docs/ssh-key", icon: KeyRound },
+      { title: "SSH Key 등록", label: <>SSH Key<br />등록</>, href: "/docs/ssh-key", icon: KeyRound },
       { title: "Public IP / GPU 안내", href: "/docs/advanced-resources", icon: Cpu },
     ],
   },
@@ -408,7 +409,7 @@ export function Sidebar() {
                                     )}
                                   >
                                     <ChildIcon className={cn("h-3.5 w-3.5 shrink-0 transition-colors", childIsActive ? "text-white" : "")} />
-                                    <span>{child.title}</span>
+                                    <span>{child.label ?? child.title}</span>
                                   </Link>
                                 </div>
                               )
