@@ -122,6 +122,7 @@ runcmd:
   - echo "root:{root_password}" | chpasswd
   - printf "PasswordAuthentication yes\\nPermitRootLogin no\\nMaxAuthTries 5\\n" > /etc/ssh/sshd_config.d/99-gsmsv.conf
   - systemctl restart ssh
+  - sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.kakao.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirror.kakao.com/ubuntu|g' /etc/apt/sources.list
   - apt update
   - apt install -y qemu-guest-agent
   - systemctl enable --now qemu-guest-agent
