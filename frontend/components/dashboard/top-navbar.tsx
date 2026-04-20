@@ -23,6 +23,32 @@ import { useRouter } from "next/navigation"
 import { useNotifications, getNotificationColor } from "@/lib/notification-context"
 import { getMyVms, getAllVms, type VmInfo, type AdminNodeVms } from "@/lib/api"
 
+function SearchResultList({ filtered, onSelect }: { filtered: VmInfo[]; onSelect: (vm: VmInfo) => void }) {
+  if (filtered.length === 0) {
+    return <div className="px-4 py-6 text-center text-sm text-muted-foreground">검색 결과가 없습니다</div>
+  }
+  return (
+    <>
+      {filtered.slice(0, 10).map((vm) => (
+        <button
+          key={`${vm.node}-${vm.vmid}`}
+          className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent transition-colors"
+          onClick={() => onSelect(vm)}
+        >
+          <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <span className="font-medium">{vm.name}</span>
+            <span className="ml-2 text-xs text-muted-foreground">VMID {vm.vmid}</span>
+          </div>
+          <span className={`h-2 w-2 shrink-0 rounded-full ${
+            vm.status === "running" ? "bg-green-500" : vm.status === "stopped" ? "bg-red-400" : "bg-yellow-400"
+          }`} />
+        </button>
+      ))}
+    </>
+  )
+}
+
 function formatTimeAgo(date: Date): string {
   const now = new Date()
   const diff = Math.floor((now.getTime() - date.getTime()) / 1000)
@@ -146,33 +172,15 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
           </div>
           {showResults && (
             <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
-              {filtered.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  검색 결과가 없습니다
-                </div>
-              ) : (
-                filtered.slice(0, 10).map((vm) => (
-                  <button
-                    key={`${vm.node}-${vm.vmid}`}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent transition-colors"
-                    onClick={() => {
-                      router.push(`/instances/${vm.vmid}?node=${vm.node}`)
-                      setShowMobileSearch(false)
-                      setShowResults(false)
-                      setQuery("")
-                    }}
-                  >
-                    <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <span className="font-medium">{vm.name}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">VMID {vm.vmid}</span>
-                    </div>
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${
-                      vm.status === "running" ? "bg-green-500" : vm.status === "stopped" ? "bg-red-400" : "bg-yellow-400"
-                    }`} />
-                  </button>
-                ))
-              )}
+              <SearchResultList
+                filtered={filtered}
+                onSelect={(vm) => {
+                  router.push(`/instances/${vm.vmid}?node=${vm.node}`)
+                  setShowMobileSearch(false)
+                  setShowResults(false)
+                  setQuery("")
+                }}
+              />
             </div>
           )}
         </div>
@@ -199,32 +207,14 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
         />
         {showResults && (
           <div className="absolute top-full left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg z-50">
-            {filtered.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                검색 결과가 없습니다
-              </div>
-            ) : (
-              filtered.slice(0, 10).map((vm) => (
-                <button
-                  key={`${vm.node}-${vm.vmid}`}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent transition-colors"
-                  onClick={() => {
-                    router.push(`/instances/${vm.vmid}?node=${vm.node}`)
-                    setShowResults(false)
-                    setQuery("")
-                  }}
-                >
-                  <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <span className="font-medium">{vm.name}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">VMID {vm.vmid}</span>
-                  </div>
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${
-                    vm.status === "running" ? "bg-green-500" : vm.status === "stopped" ? "bg-red-400" : "bg-yellow-400"
-                  }`} />
-                </button>
-              ))
-            )}
+            <SearchResultList
+              filtered={filtered}
+              onSelect={(vm) => {
+                router.push(`/instances/${vm.vmid}?node=${vm.node}`)
+                setShowResults(false)
+                setQuery("")
+              }}
+            />
           </div>
         )}
       </div>
