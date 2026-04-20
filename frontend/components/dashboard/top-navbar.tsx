@@ -51,6 +51,7 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const [query, setQuery] = useState("")
   const [allVms, setAllVms] = useState<(VmInfo & { owner_email?: string })[]>([])
   const [showResults, setShowResults] = useState(false)
+  const [showMobileSearch, setShowMobileSearch] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const isAdmin = user?.role === "admin"
 
@@ -88,12 +89,94 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 md:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* 모바일 햄버거 + 검색 */}
+      {/* 모바일 햄버거 + 검색 아이콘 */}
       <div className="flex items-center gap-2 md:hidden">
         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onMenuClick}>
           <Menu className="h-5 w-5" />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => { loadVms(); setShowMobileSearch(true); setShowResults(true) }}
+        >
+          <Search className="h-5 w-5" />
+        </Button>
       </div>
+
+      {/* 모바일 검색 오버레이 */}
+      {showMobileSearch && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur p-4 md:hidden">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                placeholder="인스턴스, VM 검색..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setShowMobileSearch(false)
+                    setShowResults(false)
+                    setQuery("")
+                  }
+                  if (e.key === "Enter" && filtered.length === 1) {
+                    router.push(`/instances/${filtered[0].vmid}?node=${filtered[0].node}`)
+                    setShowMobileSearch(false)
+                    setShowResults(false)
+                    setQuery("")
+                  }
+                }}
+                className="flex h-9 w-full rounded-lg border border-input bg-card pl-10 pr-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowMobileSearch(false)
+                setShowResults(false)
+                setQuery("")
+              }}
+            >
+              취소
+            </Button>
+          </div>
+          {showResults && (
+            <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+              {filtered.length === 0 ? (
+                <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  검색 결과가 없습니다
+                </div>
+              ) : (
+                filtered.slice(0, 10).map((vm) => (
+                  <button
+                    key={`${vm.node}-${vm.vmid}`}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent transition-colors"
+                    onClick={() => {
+                      router.push(`/instances/${vm.vmid}?node=${vm.node}`)
+                      setShowMobileSearch(false)
+                      setShowResults(false)
+                      setQuery("")
+                    }}
+                  >
+                    <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium">{vm.name}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">VMID {vm.vmid}</span>
+                    </div>
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${
+                      vm.status === "running" ? "bg-green-500" : vm.status === "stopped" ? "bg-red-400" : "bg-yellow-400"
+                    }`} />
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search (데스크톱) */}
       <div ref={searchRef} className="relative hidden md:block w-[24rem]">
