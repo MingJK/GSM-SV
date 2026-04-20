@@ -216,16 +216,14 @@ async def get_vm_status(
 
         # cloud-init 완료 여부 확인 (running 상태일 때만)
         provisioning = False
-        uptime = vm_status.get("uptime", 0)
-        if vm_status.get("status") == "running" and 0 < uptime < 180:
-            # 부팅 10분 이내: guest agent로 ok.txt 확인 시도
+        if vm_status.get("status") == "running":
             try:
                 proxmox.nodes(node).qemu(vmid).agent("file-read").get(
                     file="/home/ubuntu/ok.txt"
                 )
                 # 파일 있으면 설정 완료
             except Exception:
-                # agent 미설치 또는 파일 미존재 → 설정 중
+                # agent 미응답 또는 파일 미존재 → 설정 중
                 provisioning = True
 
         # Proxmox 실시간 데이터 + DB 저장 데이터 통합
