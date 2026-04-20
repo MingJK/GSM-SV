@@ -19,6 +19,7 @@ import {
   HardDrive,
   Terminal,
   KeyRound,
+  Cpu,
   FolderKanban,
   MessageCircleQuestion,
   MessageSquarePlus,
@@ -30,6 +31,7 @@ import { useAuth } from "@/lib/auth-context"
 
 type NavItemData = {
   title: string
+  label?: React.ReactNode
   href: string
   icon: React.ComponentType<{ className?: string }>
   external?: boolean
@@ -49,9 +51,10 @@ const docCategories: DocCategory[] = [
     children: [
       { title: "인스턴스", href: "/docs/instances", icon: HardDrive },
       { title: "접속 방법", href: "/docs/access", icon: Terminal },
+      { title: "SSH Key 등록", label: <>SSH Key<br />등록</>, href: "/docs/ssh-key", icon: KeyRound },
+      { title: "Public IP / GPU 안내", href: "/docs/advanced-resources", icon: Cpu },
     ],
   },
-  { title: "SSH Key 등록", href: "/docs/ssh-key", icon: KeyRound },
   { title: "FAQ", href: "/docs/faq", icon: MessageCircleQuestion },
   { title: "질문 등록", href: "/docs/questions", icon: MessageSquarePlus },
 ]
@@ -78,7 +81,7 @@ function SlidingIndicator({ style }: { style: IndicatorStyle }) {
       style={{
         top: style.top,
         height: style.height,
-        transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease",
+        transition: "top 0.15s cubic-bezier(0.4, 0, 0.2, 1), height 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease",
         opacity: style.visible ? 1 : 0,
         width: "calc(100% - 8px)",
         marginLeft: "8px",
@@ -240,6 +243,15 @@ export function Sidebar() {
       return
     }
 
+    // 접힌 노드 안의 VM이면 숨김
+    if (activeHref.includes(":/instances/")) {
+      const [node] = activeHref.split(":")
+      if (!expandedNodes.has(node)) {
+        setIndicator((prev) => ({ ...prev, visible: false }))
+        return
+      }
+    }
+
     const el = itemRefs.current.get(activeHref)
     if (!el) {
       setIndicator((prev) => ({ ...prev, visible: false }))
@@ -253,15 +265,28 @@ export function Sidebar() {
     if (elRect.height === 0) return
 
     setIndicator({
-      top: elRect.top - containerRect.top,
+      top: elRect.top - containerRect.top + container.scrollTop,
       height: elRect.height,
       visible: true,
     })
-  }, [activeHref])
+  }, [activeHref, expandedNodes])
 
   useLayoutEffect(() => {
-    updateIndicator()
-  }, [updateIndicator, pathname, vms, adminNodes, currentNode, expandedNodes])
+    let rafId: number
+    let startTime: number | null = null
+    const duration = 320
+
+    const loop = (time: number) => {
+      if (startTime === null) startTime = time
+      updateIndicator()
+      if (time - startTime < duration) {
+        rafId = requestAnimationFrame(loop)
+      }
+    }
+
+    rafId = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(rafId)
+  }, [updateIndicator, pathname, vms, adminNodes, currentNode, expandedNodes, docsOpen])
 
   useEffect(() => {
     window.addEventListener("resize", updateIndicator)
@@ -404,7 +429,7 @@ export function Sidebar() {
                                     )}
                                   >
                                     <ChildIcon className={cn("h-3.5 w-3.5 shrink-0 transition-colors", childIsActive ? "text-white" : "")} />
-                                    <span>{child.title}</span>
+                                    <span>{child.label ?? child.title}</span>
                                   </Link>
                                 </div>
                               )

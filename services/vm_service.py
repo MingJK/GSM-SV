@@ -122,6 +122,7 @@ runcmd:
   - echo "root:{root_password}" | chpasswd
   - printf "PasswordAuthentication yes\\nPermitRootLogin no\\nMaxAuthTries 5\\n" > /etc/ssh/sshd_config.d/99-gsmsv.conf
   - systemctl restart ssh
+  - sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.kakao.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirror.kakao.com/ubuntu|g' /etc/apt/sources.list
   - apt update
   - apt install -y qemu-guest-agent
   - systemctl enable --now qemu-guest-agent
@@ -377,15 +378,11 @@ def create_vm(
             "sockets": 1,
         }
 
-        # 프로젝트 커스텀 티어: 핫플러그 활성화 (소켓 기반 CPU 변경, NUMA 필수)
+        # 프로젝트 커스텀 티어: 핫플러그 활성화 (소켓 1 고정, cores로 vCPU 조절)
         if tier == VMTierEnum.PROJECT_CUSTOM:
             config_params["hotplug"] = "cpu,memory"
             config_params["balloon"] = specs["memory"] // 2
             config_params["numa"] = 1
-            # 소켓 기반: cores=2 고정, sockets로 총 vCPU 조절 (2,4,6,8)
-            sockets = max(1, specs["cores"] // 2)
-            config_params["cores"] = 2
-            config_params["sockets"] = sockets
 
         proxmox.nodes(server.name).qemu(vmid).config.put(**config_params)
 
