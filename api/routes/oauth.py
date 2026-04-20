@@ -18,7 +18,6 @@ from slowapi.util import get_remote_address
 
 from core.config import settings
 from core.database import get_db
-from core.timezone import now_kst
 from models.user import User, UserRole
 from core.security import create_access_token, create_refresh_token
 

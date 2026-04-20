@@ -8,7 +8,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from core.database import Base, get_db
 from main import app
-from httpx import AsyncClient, ASGITransport
 
 # 테스트용 인메모리 SQLite
 TEST_DATABASE_URL = "sqlite:///./test.db"

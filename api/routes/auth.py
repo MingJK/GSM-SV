@@ -1,12 +1,13 @@
 import json
-import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from core.timezone import now_kst
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel as _BM
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from core.database import get_db
@@ -38,8 +39,6 @@ def _issue_tokens(user_id: int) -> dict:
         "token_type": "bearer",
     }
 
-
-from fastapi.responses import JSONResponse
 
 def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str):
     """httpOnly 쿠키에 JWT 토큰을 설정합니다."""
@@ -659,8 +658,6 @@ async def confirm_password_reset(request: Request, body: PasswordResetConfirm, d
 
 
 # ── 비밀번호 변경 (로그인 상태) ─────────────────────────────
-
-from pydantic import BaseModel as _BM
 
 class ChangePasswordRequest(_BM):
     current_password: str
