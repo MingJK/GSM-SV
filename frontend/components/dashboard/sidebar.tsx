@@ -25,10 +25,11 @@ import {
   MessageSquarePlus,
   ChevronDown,
   UserCheck,
+  X,
 } from "lucide-react"
 import { getMyVms, getAllVms, type VmInfo, type AdminNodeVms } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 
 type NavItemData = {
   title: string
@@ -633,6 +634,14 @@ export function Sidebar({
       </aside>
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onMobileClose?.()}>
         <SheetContent side="left" className="w-52 p-0 bg-sidebar border-r border-sidebar-border [&>button]:hidden">
+          <SheetTitle className="sr-only">사이드바 메뉴</SheetTitle>
+          <button
+            onClick={onMobileClose}
+            className="absolute right-2 top-2 z-50 rounded-sm p-1 text-sidebar-foreground opacity-70 hover:opacity-100"
+            aria-label="닫기"
+          >
+            <X className="h-4 w-4" />
+          </button>
           {sidebarInner}
         </SheetContent>
       </Sheet>
