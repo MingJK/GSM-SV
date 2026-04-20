@@ -314,7 +314,7 @@ export function Sidebar({
 
   const isDocsActive = pathname.startsWith("/docs")
 
-  const sidebarInner = (
+  const makeSidebarContent = (withRefs: boolean) => (
     <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2.5 px-4 mt-3">
@@ -325,7 +325,7 @@ export function Sidebar({
         </div>
 
         {/* Navigation */}
-        <nav ref={navContainerRef} className="relative flex-1 overflow-y-auto overflow-x-hidden py-4 sidebar-scroll">
+        <nav ref={withRefs ? navContainerRef : undefined} className="relative flex-1 overflow-y-auto overflow-x-hidden py-4 sidebar-scroll">
           <SlidingIndicator style={indicator} />
 
           {/* 메뉴 */}
@@ -339,7 +339,7 @@ export function Sidebar({
                   key={item.title}
                   item={item}
                   isActive={isItemActive(item.href)}
-                  itemRef={getItemRef(item.href)}
+                  itemRef={withRefs ? getItemRef(item.href) : () => {}}
                 />
               ))}
             </div>
@@ -461,7 +461,7 @@ export function Sidebar({
                 <NavItem
                   item={{ title: "가입 승인", href: "/admin/approvals", icon: UserCheck }}
                   isActive={isItemActive("/admin/approvals")}
-                  itemRef={getItemRef("/admin/approvals")}
+                  itemRef={withRefs ? getItemRef("/admin/approvals") : () => {}}
                 />
               </div>
             </div>
@@ -515,7 +515,7 @@ export function Sidebar({
                             return (
                               <div
                                 key={`${vm.node}-${vm.vmid}`}
-                                ref={getItemRef(vmKey)}
+                                ref={withRefs ? getItemRef(vmKey) : undefined}
                                 className="relative"
                               >
                                 <Link
@@ -570,7 +570,7 @@ export function Sidebar({
                     return (
                       <div
                         key={`${vm.node}-${vm.vmid}`}
-                        ref={getItemRef(href)}
+                        ref={withRefs ? getItemRef(href) : undefined}
                         className="relative"
                       >
                         <Link
@@ -630,7 +630,7 @@ export function Sidebar({
   return (
     <>
       <aside className="fixed left-0 top-0 z-40 h-screen w-52 bg-sidebar hidden md:block">
-        {sidebarInner}
+        {makeSidebarContent(true)}
       </aside>
       <Sheet open={mobileOpen} onOpenChange={(open) => !open && onMobileClose?.()}>
         <SheetContent side="left" className="w-52 p-0 bg-sidebar border-r border-sidebar-border [&>button]:hidden">
@@ -642,7 +642,7 @@ export function Sidebar({
           >
             <X className="h-4 w-4" />
           </button>
-          {sidebarInner}
+          {makeSidebarContent(false)}
         </SheetContent>
       </Sheet>
     </>
