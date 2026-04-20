@@ -33,7 +33,7 @@ export default function DashboardLayout({
     <NotificationProvider>
       <SessionNotificationHandler />
       <div className="min-h-screen bg-sidebar">
-        <Suspense fallback={null}>
+        <Suspense fallback={<aside className="fixed left-0 top-0 z-40 h-screen w-52 bg-sidebar hidden md:block" />}>
           <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
         </Suspense>
         <div className="md:pl-52">
