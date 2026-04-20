@@ -3,7 +3,6 @@ from sqlalchemy.orm import relationship
 from core.database import Base
 from core.timezone import now_kst
 from core.encryption import encrypt, decrypt
-from models.user import User # 관계 설정을 위해 임포트
 
 # ============================================================================
 # 각 물리 서버에 생성된 가상 머신(VM) 목록을 추적하는 테이블

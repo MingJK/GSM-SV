@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from core.timezone import now_kst
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from sqlalchemy.orm import Session
@@ -333,14 +333,13 @@ async def resize_vm(
         raise HTTPException(status_code=400, detail="변경할 값이 없습니다.")
 
     update_params = {}
-    max_vcpus = 8  # 2코어 × 4소켓
     max_memory = 32768  # 32GB
 
     if body.cores is not None:
-        # cores 값은 총 vCPU 수 (2,4,6,8), 소켓 단위로 변환
+        # cores 값은 총 vCPU 수 (2,4,6,8), 소켓 1 고정 + cores로 조절
         if body.cores not in (2, 4, 6, 8):
             raise HTTPException(status_code=400, detail="vCPU는 2, 4, 6, 8 중 선택해주세요.")
-        update_params["sockets"] = body.cores // 2
+        update_params["cores"] = body.cores
 
     if body.memory is not None:
         if not (4096 <= body.memory <= max_memory):

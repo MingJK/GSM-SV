@@ -1,14 +1,12 @@
 import re
+import logging
 import paramiko
 from datetime import datetime
+from pathlib import Path
 from models.server import Server
 from core.config import settings
-from fastapi import HTTPException
-import logging
 
 logger = logging.getLogger(__name__)
-
-from pathlib import Path
 
 BACKUP_DIR = Path("backups/iptables")
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)

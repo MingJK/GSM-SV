@@ -1,7 +1,7 @@
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from core.timezone import now_kst
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,9 +15,7 @@ from core.config import settings
 from core.database import Base, engine, SessionLocal
 from core.init_servers import sync_servers
 from models.vm import Vm
-from models.user import UserRole
 from models.notification import Notification
-from models.faq_question import FaqQuestion
 
 
 import logging

@@ -4,7 +4,7 @@ import string
 import secrets
 import time
 import paramiko
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from core.timezone import now_kst
 
 from fastapi import HTTPException, status
@@ -378,15 +378,11 @@ def create_vm(
             "sockets": 1,
         }
 
-        # 프로젝트 커스텀 티어: 핫플러그 활성화 (소켓 기반 CPU 변경, NUMA 필수)
+        # 프로젝트 커스텀 티어: 핫플러그 활성화 (소켓 1 고정, cores로 vCPU 조절)
         if tier == VMTierEnum.PROJECT_CUSTOM:
             config_params["hotplug"] = "cpu,memory"
             config_params["balloon"] = specs["memory"] // 2
             config_params["numa"] = 1
-            # 소켓 기반: cores=2 고정, sockets로 총 vCPU 조절 (2,4,6,8)
-            sockets = max(1, specs["cores"] // 2)
-            config_params["cores"] = 2
-            config_params["sockets"] = sockets
 
         proxmox.nodes(server.name).qemu(vmid).config.put(**config_params)
 
