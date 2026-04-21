@@ -538,7 +538,7 @@ def delete_vm(
         if vm_record.internal_ip:
             custom_ports = db.query(VmPort).filter(
                 VmPort.vm_id == vm_record.id,
-                VmPort.is_default == False,  # noqa: E712
+                VmPort.is_default.is_(False),
             ).all()
             for port in custom_ports:
                 protocols = ["tcp", "udp"] if port.protocol == "tcp/udp" else [port.protocol]

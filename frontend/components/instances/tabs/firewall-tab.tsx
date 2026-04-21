@@ -45,8 +45,8 @@ export function FirewallTab({
     try {
       const data = await getCustomPorts(instance.vmid)
       setCustomPorts(data)
-    } catch {
-      // 조용히 실패
+    } catch (e) {
+      console.error("fetchPorts 실패:", e)
     } finally {
       setLoading(false)
     }
