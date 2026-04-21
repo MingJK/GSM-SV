@@ -60,7 +60,7 @@ export function OverviewTab({
       ? (instance.mem_usage / instance.maxmem) * 100
       : null
 
-  const sshPort = ports.find((p) => p.service?.toLowerCase() === "ssh")?.public_port
+  const sshPort = ports.find((p) => p.service?.toLowerCase().includes("ssh"))?.public_port
   const sshCommand = sshPort ? `ssh ubuntu@ssh.gsmsv.site -p ${sshPort}` : null
 
   return (
@@ -237,13 +237,13 @@ export function OverviewTab({
             </div>
           </div>
           {sshCommand && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-3 text-muted-foreground">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-muted-foreground shrink-0">
                 <Terminal className="h-4 w-4" />
                 <span className="text-sm">SSH 빠른 접속</span>
               </div>
-              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/50">
-                <code className="text-xs font-mono break-all">{sshCommand}</code>
+              <div className="flex items-center gap-1 min-w-0">
+                <code className="font-mono text-xs truncate">{sshCommand}</code>
                 <Button
                   variant="ghost"
                   size="icon"
