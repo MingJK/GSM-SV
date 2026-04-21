@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 from sqlalchemy.orm import Session
 from schemas.fw_schema import FirewallRule
@@ -18,6 +18,20 @@ class VmPortCreate(BaseModel):
     action: str = "ACCEPT"
     source: Optional[str] = None
     description: Optional[str] = None
+
+    @field_validator("protocol")
+    @classmethod
+    def validate_protocol(cls, v: str) -> str:
+        if v not in ("tcp", "udp"):
+            raise ValueError("프로토콜은 tcp 또는 udp만 허용됩니다.")
+        return v
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, v: str) -> str:
+        if v not in ("ACCEPT", "DROP"):
+            raise ValueError("액션은 ACCEPT 또는 DROP만 허용됩니다.")
+        return v
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -160,9 +174,9 @@ async def add_custom_port(
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    # iptables DNAT 추가
+    # iptables DNAT 추가 — 실패 시 DB 저장 중단
     if vm.internal_ip:
-        manage_custom_iptables(
+        success = manage_custom_iptables(
             server=server,
             vm_ip=vm.internal_ip,
             internal_port=body.internal_port,
@@ -170,6 +184,8 @@ async def add_custom_port(
             protocol=body.protocol,
             action="ADD",
         )
+        if not success:
+            raise HTTPException(status_code=502, detail="Gateway 방화벽 규칙 설정에 실패했습니다.")
 
     # DB 저장
     vm_port = VmPort(
@@ -210,10 +226,11 @@ async def delete_custom_port(
         raise HTTPException(status_code=404, detail="포트를 찾을 수 없습니다.")
 
     # iptables 규칙 삭제 ("tcp/udp" 프로토콜은 두 번 호출)
+    # 실패해도 DB 레코드는 삭제 — 삭제 실패 시 영구적으로 못 지우는 것이 더 위험
     if vm.internal_ip:
         protocols = ["tcp", "udp"] if vm_port.protocol == "tcp/udp" else [vm_port.protocol]
         for proto in protocols:
-            manage_custom_iptables(
+            success = manage_custom_iptables(
                 server=server,
                 vm_ip=vm.internal_ip,
                 internal_port=vm_port.internal_port,
@@ -221,6 +238,8 @@ async def delete_custom_port(
                 protocol=proto,
                 action="DELETE",
             )
+            if not success:
+                logger.error(f"[firewall] Gateway iptables 삭제 실패 — port {vm_port.external_port} ({proto}), DB 레코드는 삭제 진행")
 
     db.delete(vm_port)
     db.commit()

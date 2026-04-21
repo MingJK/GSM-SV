@@ -56,12 +56,14 @@ export function FirewallTab({
     fetchPorts()
   }, [fetchPorts])
 
-  const handleCopy = (text: string, id: number) => {
-    navigator.clipboard.writeText(text)
-    setTimeout(() => {
+  const handleCopy = async (text: string, id: number) => {
+    try {
+      await navigator.clipboard.writeText(text)
       setCopiedId(id)
       setTimeout(() => setCopiedId(null), 1500)
-    }, 100)
+    } catch {
+      // 복사 실패 시 조용히 무시
+    }
   }
 
   const handleAdd = async () => {

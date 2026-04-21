@@ -105,13 +105,15 @@ def manage_iptables(server: Server, vmid: int, vm_ip: str, action: str = "ADD"):
 def allocate_random_port(db: Session, start: int = 30000, end: int = 39999) -> int:
     """30000~39999 범위에서 DB에 없는 미사용 외부 포트를 랜덤으로 반환합니다."""
     from models.vm_port import VmPort
-    used = {row.external_port for row in db.query(VmPort.external_port).all()}
-    candidates = list(range(start, end + 1))
-    random.shuffle(candidates)
-    for port in candidates:
-        if port not in used:
+    for _ in range(100):
+        port = random.randint(start, end)
+        exists = db.query(VmPort).filter(VmPort.external_port == port).first()
+        if not exists:
             return port
     raise RuntimeError("30000~39999 범위에서 할당 가능한 포트가 없습니다.")
+
+
+_VALID_PROTOCOLS = {"tcp", "udp"}
 
 
 def manage_custom_iptables(
@@ -123,6 +125,8 @@ def manage_custom_iptables(
     action: str = "ADD",
 ) -> bool:
     """커스텀 포트 포워딩 iptables 규칙을 추가하거나 삭제합니다."""
+    if protocol not in _VALID_PROTOCOLS:
+        raise ValueError(f"유효하지 않은 프로토콜: {protocol}. tcp 또는 udp만 허용됩니다.")
     _validate_ip(vm_ip)
     _validate_ip(settings.GATEWAY_PUBLIC_IP)
 
