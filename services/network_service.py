@@ -1,14 +1,14 @@
 import re
+import random
+import logging
 import paramiko
 from datetime import datetime
+from pathlib import Path
+from sqlalchemy.orm import Session
 from models.server import Server
 from core.config import settings
-from fastapi import HTTPException
-import logging
 
 logger = logging.getLogger(__name__)
-
-from pathlib import Path
 
 BACKUP_DIR = Path("backups/iptables")
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
@@ -99,6 +99,63 @@ def manage_iptables(server: Server, vmid: int, vm_ip: str, action: str = "ADD"):
     except Exception as e:
         logger.error(f"Gateway SSH 접속 및 iptables 설정 실패: {e}")
         # 생성/삭제 핵심 로직을 멈추지는 않되 로그를 기록함
+        return False
+
+
+def allocate_random_port(db: Session, start: int = 30000, end: int = 39999) -> int:
+    """30000~39999 범위에서 DB에 없는 미사용 외부 포트를 랜덤으로 반환합니다."""
+    from models.vm_port import VmPort
+    used = {row.external_port for row in db.query(VmPort.external_port).all()}
+    candidates = list(range(start, end + 1))
+    random.shuffle(candidates)
+    for port in candidates:
+        if port not in used:
+            return port
+    raise RuntimeError("30000~39999 범위에서 할당 가능한 포트가 없습니다.")
+
+
+def manage_custom_iptables(
+    server: Server,
+    vm_ip: str,
+    internal_port: int,
+    external_port: int,
+    protocol: str,
+    action: str = "ADD",
+) -> bool:
+    """커스텀 포트 포워딩 iptables 규칙을 추가하거나 삭제합니다."""
+    _validate_ip(vm_ip)
+    _validate_ip(settings.GATEWAY_PUBLIC_IP)
+
+    if not server.gateway_ip or not server.gateway_user:
+        logger.warning(f"서버 {server.name}의 Gateway 정보가 설정되지 않아 iptables 설정을 건너뜁니다.")
+        return False
+
+    flag = "-A" if action == "ADD" else "-D"
+    commands = [
+        f"sudo iptables -t nat {flag} PREROUTING -p {protocol} -d {settings.GATEWAY_PUBLIC_IP} --dport {external_port} -j DNAT --to-destination {vm_ip}:{internal_port}",
+        f"sudo iptables {flag} FORWARD -p {protocol} -d {vm_ip} --dport {internal_port} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT",
+    ]
+
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.WarningPolicy())
+        ssh.connect(
+            hostname=server.gateway_ip,
+            username=server.gateway_user,
+            password=server.gateway_password or "",
+            timeout=10,
+        )
+        for cmd in commands:
+            logger.info(f"Executing on {server.gateway_ip}: {cmd}")
+            _, _, stderr = ssh.exec_command(cmd)
+            err = stderr.read().decode()
+            if err:
+                logger.error(f"iptables command error: {err}")
+        _backup_iptables(ssh, server.gateway_ip)
+        ssh.close()
+        return True
+    except Exception as e:
+        logger.error(f"Gateway SSH 접속 및 커스텀 iptables 설정 실패: {e}")
         return False
 
 
