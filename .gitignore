@@ -34,3 +34,12 @@ uploads/
 
 # Claude
 .claude/
+CLAUDE.md
+
+# 인프라 설정 (로컬 배포용)
+Dockerfile
+docker-compose.yml
+.dockerignore
+frontend/Dockerfile
+frontend/.dockerignore
+nginx/
