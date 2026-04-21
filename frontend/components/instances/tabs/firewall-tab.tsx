@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Globe, Copy, Check, Shield, Plus, Trash2, Loader2 } from "lucide-react"
+import { Globe, Copy, Check, Shield, Plus, Trash2, Loader2, ChevronDown } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,14 +20,15 @@ import { type PortInfo, type VmPort, getCustomPorts, addCustomPort, deleteCustom
 
 export function FirewallTab({
   instance,
-  ports = [],
+  ports: _ports = [],
 }: {
   instance: Instance
   ports?: PortInfo[]
 }) {
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const [copiedId, setCopiedId] = useState<number | null>(null)
   const [customPorts, setCustomPorts] = useState<VmPort[]>([])
   const [loading, setLoading] = useState(true)
+  const [portsOpen, setPortsOpen] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -55,11 +56,11 @@ export function FirewallTab({
     fetchPorts()
   }, [fetchPorts])
 
-  const handleCopy = (text: string, index: number) => {
+  const handleCopy = (text: string, id: number) => {
     navigator.clipboard.writeText(text)
     setTimeout(() => {
-      setCopiedIndex(index)
-      setTimeout(() => setCopiedIndex(null), 1500)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 1500)
     }, 100)
   }
 
@@ -99,47 +100,67 @@ export function FirewallTab({
 
   return (
     <div className="space-y-6">
-      {/* 외부 접속 포트 (포트포워딩) */}
-      {ports.length > 0 ? (
-        <Card>
-          <CardHeader>
+      {/* 외부 접속 포트 — DB 기반으로 삭제/추가 즉시 반영 */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer select-none flex flex-row items-center justify-between space-y-0"
+          onClick={() => setPortsOpen((o) => !o)}
+        >
+          <div>
             <CardTitle className="flex items-center gap-2 text-base font-medium">
               <Globe className="h-4 w-4" />
               외부 접속 포트
             </CardTitle>
-            <CardDescription>포트포워딩이 설정된 서비스 목록입니다.</CardDescription>
-          </CardHeader>
+            <CardDescription className="mt-1">포트포워딩이 설정된 서비스 목록입니다.</CardDescription>
+          </div>
+          <ChevronDown
+            className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${portsOpen ? "rotate-180" : ""}`}
+          />
+        </CardHeader>
+
+        {portsOpen && (
           <CardContent className="space-y-3">
-            {ports.map((port, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50"
-              >
-                <div className="min-w-0 space-y-0.5">
-                  <p className="text-xs text-muted-foreground font-medium">{port.service}</p>
-                  <p className="font-mono text-sm font-bold break-all">ssh.gsmsv.site:{port.public_port}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => handleCopy(`ssh.gsmsv.site:${port.public_port}`, i)}
-                >
-                  {copiedIndex === i
-                    ? <Check className="h-3.5 w-3.5 text-emerald-500" />
-                    : <Copy className="h-3.5 w-3.5" />}
-                </Button>
+            {loading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               </div>
-            ))}
+            ) : customPorts.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-4">
+                포트포워딩 정보가 없습니다.
+              </p>
+            ) : (
+              customPorts.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {p.description || `포트 ${p.internal_port}`}
+                    </p>
+                    <p className="font-mono text-sm font-bold break-all">
+                      ssh.gsmsv.site:{p.external_port}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleCopy(`ssh.gsmsv.site:${p.external_port}`, p.id)
+                    }}
+                  >
+                    {copiedId === p.id
+                      ? <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+              ))
+            )}
           </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="py-8">
-            <p className="text-center text-muted-foreground">포트포워딩 정보가 없습니다.</p>
-          </CardContent>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* 방화벽 규칙 */}
       <Card>
