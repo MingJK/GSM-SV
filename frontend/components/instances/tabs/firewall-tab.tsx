@@ -18,12 +18,6 @@ import { Label } from "@/components/ui/label"
 import type { Instance } from "@/lib/types"
 import { type PortInfo, type VmPort, getCustomPorts, addCustomPort, deleteCustomPort } from "@/lib/api"
 
-const DEFAULT_RULES = [
-  { port: 22, label: "SSH" },
-  { port: 80, label: "HTTP" },
-  { port: 10000, label: "SVC" },
-]
-
 export function FirewallTab({
   instance,
   ports = [],
@@ -41,6 +35,8 @@ export function FirewallTab({
   const [form, setForm] = useState({
     internal_port: "",
     protocol: "tcp",
+    action: "ACCEPT",
+    source: "",
     description: "",
   })
 
@@ -75,9 +71,11 @@ export function FirewallTab({
       await addCustomPort(instance.vmid, {
         internal_port: port,
         protocol: form.protocol,
+        action: form.action,
+        source: form.source || undefined,
         description: form.description || undefined,
       })
-      setForm({ internal_port: "", protocol: "tcp", description: "" })
+      setForm({ internal_port: "", protocol: "tcp", action: "ACCEPT", source: "", description: "" })
       setDialogOpen(false)
       await fetchPorts()
     } catch {
@@ -87,7 +85,7 @@ export function FirewallTab({
     }
   }
 
-  const handleDelete = async (portId: number) => {
+  const handleDeleteCustom = async (portId: number) => {
     setDeletingId(portId)
     try {
       await deleteCustomPort(instance.vmid, portId)
@@ -178,25 +176,50 @@ export function FirewallTab({
                     onChange={(e) => setForm((f) => ({ ...f, internal_port: e.target.value }))}
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>프로토콜</Label>
+                    <Select
+                      value={form.protocol}
+                      onValueChange={(v) => setForm((f) => ({ ...f, protocol: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tcp">TCP</SelectItem>
+                        <SelectItem value="udp">UDP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>액션</Label>
+                    <Select
+                      value={form.action}
+                      onValueChange={(v) => setForm((f) => ({ ...f, action: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ACCEPT">ACCEPT</SelectItem>
+                        <SelectItem value="DROP">DROP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div className="space-y-1.5">
-                  <Label>프로토콜</Label>
-                  <Select
-                    value={form.protocol}
-                    onValueChange={(v) => setForm((f) => ({ ...f, protocol: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tcp">TCP</SelectItem>
-                      <SelectItem value="udp">UDP</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label>출발지 IP <span className="text-muted-foreground text-xs">(선택, 기본 0.0.0.0/0)</span></Label>
+                  <Input
+                    placeholder="예: 192.168.1.0/24"
+                    value={form.source}
+                    onChange={(e) => setForm((f) => ({ ...f, source: e.target.value }))}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>설명 <span className="text-muted-foreground text-xs">(선택)</span></Label>
                   <Input
-                    placeholder="예: HTTPS, 게임 서버"
+                    placeholder="예: HTTPS, API 서버"
                     value={form.description}
                     onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   />
@@ -214,57 +237,54 @@ export function FirewallTab({
           </Dialog>
         </CardHeader>
         <CardContent className="space-y-2">
-          {/* 기본 규칙 (읽기 전용) */}
-          {DEFAULT_RULES.map(({ port, label }) => (
-            <div
-              key={port}
-              className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/30 border border-border/40"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="inline-flex items-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium px-2 py-0.5 ring-1 ring-inset ring-emerald-500/20">
-                  ACCEPT
-                </span>
-                <span className="text-xs text-muted-foreground uppercase">TCP</span>
-                <span className="font-mono text-sm font-semibold">{port}</span>
-                <span className="text-xs text-muted-foreground">{label}</span>
-              </div>
-              <span className="text-xs text-muted-foreground shrink-0">기본</span>
-            </div>
-          ))}
-
-          {/* 커스텀 포트 */}
           {loading ? (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           ) : customPorts.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-4">
-              추가 포트가 없습니다.
+              포트 규칙이 없습니다.
             </p>
           ) : (
             customPorts.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-muted/50 border border-border/50"
+                className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${
+                  p.is_default
+                    ? "bg-muted/30 border-border/40"
+                    : "bg-muted/50 border-border/50"
+                }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="inline-flex items-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-medium px-2 py-0.5 ring-1 ring-inset ring-emerald-500/20">
-                    ACCEPT
+                  <span className={`inline-flex items-center rounded-md text-xs font-medium px-2 py-0.5 ring-1 ring-inset ${
+                    p.action === "DROP"
+                      ? "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20"
+                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20"
+                  }`}>
+                    {p.action ?? "ACCEPT"}
                   </span>
                   <span className="text-xs text-muted-foreground uppercase">{p.protocol}</span>
                   <span className="font-mono text-sm font-semibold">{p.internal_port}</span>
+                  {p.source && p.source !== "0.0.0.0/0" && (
+                    <span className="text-xs text-muted-foreground font-mono truncate">{p.source}</span>
+                  )}
                   {p.description && (
                     <span className="text-xs text-muted-foreground truncate">{p.description}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-muted-foreground font-mono">:{p.external_port}</span>
+                  {!p.is_default && (
+                    <span className="text-xs text-muted-foreground font-mono">:{p.external_port}</span>
+                  )}
+                  {p.is_default && (
+                    <span className="text-xs text-muted-foreground">기본</span>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 text-muted-foreground hover:text-destructive"
                     disabled={deletingId === p.id}
-                    onClick={() => handleDelete(p.id)}
+                    onClick={() => handleDeleteCustom(p.id)}
                   >
                     {deletingId === p.id
                       ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

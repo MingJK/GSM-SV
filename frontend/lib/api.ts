@@ -366,7 +366,10 @@ export interface VmPort {
   internal_port: number
   external_port: number
   protocol: string
+  action?: string
+  source?: string
   description?: string
+  is_default?: boolean
 }
 
 export async function getCustomPorts(vmid: number): Promise<VmPort[]> {
@@ -376,7 +379,7 @@ export async function getCustomPorts(vmid: number): Promise<VmPort[]> {
 
 export async function addCustomPort(
   vmid: number,
-  body: { internal_port: number; protocol: string; description?: string }
+  body: { internal_port: number; protocol: string; action?: string; source?: string; description?: string }
 ): Promise<VmPort> {
   return api<VmPort>(`/firewall/${vmid}/ports`, { method: "POST", body: body as unknown as BodyInit });
 }
