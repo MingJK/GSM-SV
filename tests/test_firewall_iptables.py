@@ -58,6 +58,7 @@ def _make_ssh_mock():
     """paramiko SSHClient mock — exec_command 결과 반환"""
     ssh = MagicMock()
     stdout = MagicMock()
+    stdout.channel.recv_exit_status.return_value = 0
     stdout.read.return_value = b"# iptables rules\n-A PREROUTING ...\n"
     stderr = MagicMock()
     stderr.read.return_value = b""

@@ -74,8 +74,8 @@ def manage_iptables(server: Server, vmid: int, vm_ip: str, action: str = "ADD"):
                 commands.append(f"sudo iptables -t nat -D PREROUTING -p {proto} -d {settings.GATEWAY_PUBLIC_IP} --dport {public_port} -j DNAT --to-destination {vm_ip}:{internal_port}")
                 commands.append(f"sudo iptables -D FORWARD -p {proto} -d {vm_ip} --dport {internal_port} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT")
 
+    ssh = paramiko.SSHClient()
     try:
-        ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.WarningPolicy())
         ssh.connect(
             hostname=server.gateway_ip,
@@ -83,23 +83,25 @@ def manage_iptables(server: Server, vmid: int, vm_ip: str, action: str = "ADD"):
             password=server.gateway_password or "",
             timeout=10
         )
-        
+
         for cmd in commands:
             logger.info(f"Executing on {server.gateway_ip}: {cmd}")
-            stdin, stdout, stderr = ssh.exec_command(cmd)
-            err = stderr.read().decode()
-            if err:
-                logger.error(f"iptables command error: {err}")
+            _, stdout_ch, stderr_ch = ssh.exec_command(cmd)
+            exit_status = stdout_ch.channel.recv_exit_status()
+            if exit_status != 0:
+                err = stderr_ch.read().decode()
+                logger.error(f"iptables command failed (exit {exit_status}): {err}")
 
         # iptables 백업 (변경 후 자동 저장)
         _backup_iptables(ssh, server.gateway_ip)
 
-        ssh.close()
         return True
     except Exception as e:
         logger.error(f"Gateway SSH 접속 및 iptables 설정 실패: {e}")
         # 생성/삭제 핵심 로직을 멈추지는 않되 로그를 기록함
         return False
+    finally:
+        ssh.close()
 
 
 def allocate_random_port(db: Session, start: int = 30000, end: int = 39999) -> int:
@@ -140,8 +142,8 @@ def manage_custom_iptables(
         f"sudo iptables {flag} FORWARD -p {protocol} -d {vm_ip} --dport {internal_port} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT",
     ]
 
+    ssh = paramiko.SSHClient()
     try:
-        ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.WarningPolicy())
         ssh.connect(
             hostname=server.gateway_ip,
@@ -151,16 +153,19 @@ def manage_custom_iptables(
         )
         for cmd in commands:
             logger.info(f"Executing on {server.gateway_ip}: {cmd}")
-            _, _, stderr = ssh.exec_command(cmd)
-            err = stderr.read().decode()
-            if err:
-                logger.error(f"iptables command error: {err}")
+            _, stdout_ch, stderr_ch = ssh.exec_command(cmd)
+            exit_status = stdout_ch.channel.recv_exit_status()
+            if exit_status != 0:
+                err = stderr_ch.read().decode()
+                logger.error(f"iptables command failed (exit {exit_status}): {err}")
+                return False
         _backup_iptables(ssh, server.gateway_ip)
-        ssh.close()
         return True
     except Exception as e:
         logger.error(f"Gateway SSH 접속 및 커스텀 iptables 설정 실패: {e}")
         return False
+    finally:
+        ssh.close()
 
 
 def _backup_iptables(ssh: paramiko.SSHClient, gateway_ip: str, **_kwargs):

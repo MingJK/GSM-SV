@@ -132,7 +132,8 @@ async def get_custom_ports(
             ))
         try:
             db.commit()
-        except Exception:
+        except Exception as e:
+            logger.error(f"[firewall] 기본 포트 백필 실패: {e}")
             db.rollback()
 
     ports = db.query(VmPort).filter(VmPort.vm_id == vm.id).all()
@@ -187,7 +188,7 @@ async def add_custom_port(
         if not success:
             raise HTTPException(status_code=502, detail="Gateway 방화벽 규칙 설정에 실패했습니다.")
 
-    # DB 저장
+    # DB 저장 — 실패 시 iptables 롤백으로 고스트 규칙 방지
     vm_port = VmPort(
         vm_id=vm.id,
         internal_port=body.internal_port,
@@ -198,8 +199,22 @@ async def add_custom_port(
         description=body.description,
     )
     db.add(vm_port)
-    db.commit()
-    db.refresh(vm_port)
+    try:
+        db.commit()
+        db.refresh(vm_port)
+    except Exception as e:
+        db.rollback()
+        if vm.internal_ip:
+            manage_custom_iptables(
+                server=server,
+                vm_ip=vm.internal_ip,
+                internal_port=body.internal_port,
+                external_port=external_port,
+                protocol=body.protocol,
+                action="DELETE",
+            )
+        logger.error(f"[firewall] DB 저장 실패 — iptables 롤백 시도: {e}")
+        raise HTTPException(status_code=500, detail="포트 저장에 실패했습니다.")
 
     return {
         "id": vm_port.id,
