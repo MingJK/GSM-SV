@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from typing import Optional
 from sqlalchemy.orm import Session
 from schemas.fw_schema import FirewallRule
@@ -13,7 +13,7 @@ from api.dependencies import get_current_user, get_vm_with_owner_check
 
 
 class VmPortCreate(BaseModel):
-    internal_port: int
+    internal_port: int = Field(..., ge=1, le=65535)
     protocol: str = "tcp"
     action: str = "ACCEPT"
     source: Optional[str] = None
