@@ -351,6 +351,17 @@ def create_vm(
         # 8. iptables 포트포워딩 등록
         manage_iptables(server, vmid, internal_ip, action="ADD")
 
+        # 기본 방화벽 규칙 초기화 (22, 80, 10000 — source 0.0.0.0/0)
+        try:
+            for port in [22, 80, 10000]:
+                proxmox.nodes(server.name).qemu(vmid).firewall.rules.post(
+                    action="ACCEPT", type="in", proto="tcp",
+                    dport=str(port), source="0.0.0.0/0", enable=1,
+                )
+            proxmox.nodes(server.name).qemu(vmid).firewall.options.put(enable=1)
+        except Exception as e:
+            logger.warning(f"VM {vmid} 기본 방화벽 규칙 초기화 실패 (무시): {e}")
+
         # 9. VM 부팅
         proxmox.nodes(server.name).qemu(vmid).status.start.post()
 
