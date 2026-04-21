@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from schemas.fw_schema import FirewallRule
 from services.proxmox_client import get_proxmox_for_server
-from services.network_service import allocate_random_port, manage_custom_iptables
+from services.network_service import allocate_random_port, manage_custom_iptables, calculate_ports
 from core.database import get_db
 from models.user import User
 from models.vm_port import VmPort
@@ -94,8 +94,33 @@ async def get_custom_ports(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """커스텀 포트 목록 조회 (DB)"""
+    """커스텀 포트 목록 조회 (DB) — 기본 포트 레코드가 없으면 자동 생성"""
     vm = get_vm_with_owner_check(db, vmid, current_user)
+
+    has_defaults = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default == True).first()  # noqa: E712
+    if not has_defaults:
+        server = vm.server
+        default_port_map = calculate_ports(server.base_port, vmid)
+        for internal_port, protocol, description, external_port in [
+            (22,    "tcp",     "SSH",  default_port_map["ssh"]),
+            (80,    "tcp",     "HTTP", default_port_map["svc1"]),
+            (10000, "tcp/udp", "SVC",  default_port_map["svc2"]),
+        ]:
+            db.add(VmPort(
+                vm_id=vm.id,
+                internal_port=internal_port,
+                external_port=external_port,
+                protocol=protocol,
+                action="ACCEPT",
+                source="0.0.0.0/0",
+                description=description,
+                is_default=True,
+            ))
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+
     ports = db.query(VmPort).filter(VmPort.vm_id == vm.id).all()
     return {
         "vmid": vmid,
