@@ -273,12 +273,7 @@ export function FirewallTab({
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {!p.is_default && (
-                    <span className="text-xs text-muted-foreground font-mono">:{p.external_port}</span>
-                  )}
-                  {p.is_default && (
-                    <span className="text-xs text-muted-foreground">기본</span>
-                  )}
+                  <span className="text-xs text-muted-foreground font-mono">:{p.external_port}</span>
                   <Button
                     variant="ghost"
                     size="icon"
