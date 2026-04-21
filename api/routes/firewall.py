@@ -151,6 +151,10 @@ async def add_custom_port(
     vm = get_vm_with_owner_check(db, vmid, current_user)
     server = vm.server
 
+    custom_count = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default == False).count()  # noqa: E712
+    if custom_count >= 30:
+        raise HTTPException(status_code=409, detail="VM당 커스텀 포트는 최대 30개까지 추가할 수 있습니다.")
+
     try:
         external_port = allocate_random_port(db)
     except RuntimeError as e:
