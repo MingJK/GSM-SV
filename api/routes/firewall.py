@@ -111,7 +111,7 @@ async def get_custom_ports(
     """커스텀 포트 목록 조회 (DB) — 기본 포트 레코드가 없으면 자동 생성"""
     vm = get_vm_with_owner_check(db, vmid, current_user)
 
-    has_defaults = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default == True).first()  # noqa: E712
+    has_defaults = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(True)).first()
     if not has_defaults:
         server = vm.server
         default_port_map = calculate_ports(server.base_port, vmid)
@@ -166,7 +166,7 @@ async def add_custom_port(
     vm = get_vm_with_owner_check(db, vmid, current_user)
     server = vm.server
 
-    custom_count = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default == False).count()  # noqa: E712
+    custom_count = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(False)).count()
     if custom_count >= 30:
         raise HTTPException(status_code=409, detail="VM당 커스텀 포트는 최대 30개까지 추가할 수 있습니다.")
 
@@ -175,20 +175,7 @@ async def add_custom_port(
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    # iptables DNAT 추가 — 실패 시 DB 저장 중단
-    if vm.internal_ip:
-        success = manage_custom_iptables(
-            server=server,
-            vm_ip=vm.internal_ip,
-            internal_port=body.internal_port,
-            external_port=external_port,
-            protocol=body.protocol,
-            action="ADD",
-        )
-        if not success:
-            raise HTTPException(status_code=502, detail="Gateway 방화벽 규칙 설정에 실패했습니다.")
-
-    # DB 저장 — 실패 시 iptables 롤백으로 고스트 규칙 방지
+    # DB 먼저 저장 — 포트 선점으로 동시 요청 레이스 컨디션 방지
     vm_port = VmPort(
         vm_id=vm.id,
         internal_port=body.internal_port,
@@ -204,17 +191,23 @@ async def add_custom_port(
         db.refresh(vm_port)
     except Exception as e:
         db.rollback()
-        if vm.internal_ip:
-            manage_custom_iptables(
-                server=server,
-                vm_ip=vm.internal_ip,
-                internal_port=body.internal_port,
-                external_port=external_port,
-                protocol=body.protocol,
-                action="DELETE",
-            )
-        logger.error(f"[firewall] DB 저장 실패 — iptables 롤백 시도: {e}")
+        logger.error(f"[firewall] DB 저장 실패: {e}")
         raise HTTPException(status_code=500, detail="포트 저장에 실패했습니다.")
+
+    # iptables DNAT 추가 — 실패 시 DB 레코드 삭제
+    if vm.internal_ip:
+        success = manage_custom_iptables(
+            server=server,
+            vm_ip=vm.internal_ip,
+            internal_port=body.internal_port,
+            external_port=external_port,
+            protocol=body.protocol,
+            action="ADD",
+        )
+        if not success:
+            db.delete(vm_port)
+            db.commit()
+            raise HTTPException(status_code=502, detail="Gateway 방화벽 규칙 설정에 실패했습니다.")
 
     return {
         "id": vm_port.id,
