@@ -18,6 +18,39 @@ export default function GettingStartedPage() {
         리소스 모니터링까지 모든 작업을 간편하게 수행할 수 있습니다.
       </p>
 
+      <h2>서비스 도메인</h2>
+      <p>GSM SV는 다음 도메인을 통해 제공됩니다.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>도메인</th>
+            <th>용도</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>gsmsv.site</code></td>
+            <td>서비스 웹페이지 (콘솔 접속)</td>
+          </tr>
+          <tr>
+            <td><code>ssh.gsmsv.site</code></td>
+            <td>VM SSH 접속용 도메인</td>
+          </tr>
+          <tr>
+            <td><code>service.gsmsv.site</code></td>
+            <td>VM 웹 서비스(HTTP/SVC) 접속용 도메인</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>⚠️ 이용 시 주의사항</h2>
+      <ul>
+        <li>인스턴스 배포 시 제공되는 초기 비밀번호를 계속 사용하는 것은 권장하지 않습니다. 본인만 알 수 있는 비밀번호로 변경하거나 SSH Key를 설정하는 것을 추천드립니다.</li>
+        <li>일반 사용자(USER)의 VM은 생성 후 <strong>30일이 지나면 자동 삭제</strong>됩니다. 중요한 데이터는 GitHub 등 외부 저장소에 미리 백업해 주세요.</li>
+        <li>GSM SV는 교내 공유 자원입니다. 채굴, 게임(특정 상황 제외) 등 <strong>교육 목적에 맞지 않는 용도</strong>로 사용할 경우 사전 안내 없이 인스턴스가 삭제될 수 있습니다.</li>
+        <li>본인의 부주의로 인하여 발생한 피해는 GSM SV에서 책임을 지지 않습니다.</li>
+      </ul>
+
       <h2>제공 기능</h2>
       <ul>
         <li><strong>VM 프로비저닝</strong> — 웹 콘솔에서 클릭 몇 번으로 Ubuntu 22.04 LTS 기반 VM을 생성할 수 있습니다.</li>

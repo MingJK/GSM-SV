@@ -1,9 +1,5 @@
 from core.database import engine, Base
 # 미리 생성해둔 모델들을 import 해야 SQLAlchemy가 테이블 구조를 인식합니다.
-from models.server import Server
-from models.vm import Vm
-from models.user import User
-from models.email_verification import EmailVerification
 
 def init_db():
     print("데이터베이스 초기화를 시작합니다...")

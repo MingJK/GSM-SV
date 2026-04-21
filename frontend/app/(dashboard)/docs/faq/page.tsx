@@ -53,19 +53,9 @@ const faqItems = [
         <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
           <li>인스턴스 상세 페이지에서 VM이 <strong className="text-foreground">실행 중(Running)</strong> 상태인지 확인합니다.</li>
           <li>SSH 포트 번호가 올바른지 확인합니다. (기본 22가 아닌 할당된 포트 사용)</li>
-          <li>접속 명령어 형식을 확인합니다: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ssh ubuntu@172.10.104.3 -p &lt;포트&gt;</code></li>
-          <li>방화벽 규칙이 해당 IP 또는 포트를 차단하고 있지 않은지 확인합니다.</li>
+          <li>접속 명령어 형식을 확인합니다: <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ssh ubuntu@ssh.gsmsv.site -p &lt;포트&gt;</code></li>
         </ol>
       </div>
-    ),
-  },
-  {
-    question: "방화벽 규칙은 어떻게 추가하나요?",
-    answer: (
-      <p>
-        인스턴스 상세 페이지 → <strong>방화벽 탭</strong>에서 TCP/UDP, 소스 IP, 포트를 지정하여
-        규칙을 추가할 수 있습니다. 규칙 삭제도 동일한 탭에서 가능합니다.
-      </p>
     ),
   },
   {

@@ -86,8 +86,8 @@
   --muted-foreground: #64748b;
   --accent: #38bdf8;
   --accent-foreground: #0c0d11;
-  --destructive: #f87171;
-  --destructive-foreground: #0c0d11;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
   --border: rgba(148, 163, 184, 0.12);
   --input: rgba(148, 163, 184, 0.12);
   --ring: #38bdf8;
@@ -175,6 +175,14 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* 사이드바 스크롤바 숨김 (스크롤은 가능) */
+.sidebar-scroll {
+  scrollbar-width: none;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -187,7 +195,7 @@
   *,
   *::before,
   *::after {
-    transition: background-color 0.33s ease, border-color 0.33s ease, box-shadow 0.33s ease, opacity 0.33s ease;
+    transition: background-color 0.33s ease, border-color 0.33s ease, box-shadow 0.33s ease, opacity 0.33s ease, filter 0.33s ease;
   }
 
   /* 텍스트 요소: 글자 색상(color)만 빠르게 0.1초로 설정 (사용자 요청 반영) */

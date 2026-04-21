@@ -17,11 +17,37 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { Bell, Moon, Sun, Search, User, ChevronDown, LogOut, Inbox, Trash2, Settings, Monitor } from "lucide-react"
+import { Bell, Moon, Sun, Search, User, ChevronDown, LogOut, Inbox, Trash2, Settings, Monitor, Menu } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useNotifications, getNotificationColor } from "@/lib/notification-context"
 import { getMyVms, getAllVms, type VmInfo, type AdminNodeVms } from "@/lib/api"
+
+function SearchResultList({ filtered, onSelect }: { filtered: VmInfo[]; onSelect: (vm: VmInfo) => void }) {
+  if (filtered.length === 0) {
+    return <div className="px-4 py-6 text-center text-sm text-muted-foreground">검색 결과가 없습니다</div>
+  }
+  return (
+    <>
+      {filtered.slice(0, 10).map((vm) => (
+        <button
+          key={`${vm.node}-${vm.vmid}`}
+          className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent transition-colors"
+          onClick={() => onSelect(vm)}
+        >
+          <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <span className="font-medium">{vm.name}</span>
+            <span className="ml-2 text-xs text-muted-foreground">VMID {vm.vmid}</span>
+          </div>
+          <span className={`h-2 w-2 shrink-0 rounded-full ${
+            vm.status === "running" ? "bg-green-500" : vm.status === "stopped" ? "bg-red-400" : "bg-yellow-400"
+          }`} />
+        </button>
+      ))}
+    </>
+  )
+}
 
 function formatTimeAgo(date: Date): string {
   const now = new Date()
@@ -32,7 +58,7 @@ function formatTimeAgo(date: Date): string {
   return `${Math.floor(diff / 86400)}일 전`
 }
 
-export function TopNavbar() {
+export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const { theme, setTheme } = useTheme()
   const { user, logout } = useAuth()
   const { notifications, hasUnread, removeNotification, markAsRead, deleteAll } = useNotifications()
@@ -51,6 +77,7 @@ export function TopNavbar() {
   const [query, setQuery] = useState("")
   const [allVms, setAllVms] = useState<(VmInfo & { owner_email?: string })[]>([])
   const [showResults, setShowResults] = useState(false)
+  const [showMobileSearch, setShowMobileSearch] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const isAdmin = user?.role === "admin"
 
@@ -87,9 +114,80 @@ export function TopNavbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* Search */}
-      <div ref={searchRef} className="relative w-[24rem]">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 md:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* 모바일 햄버거 + 검색 아이콘 */}
+      <div className="flex items-center gap-2 md:hidden">
+        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onMenuClick}>
+          <Menu className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => { loadVms(); setShowMobileSearch(true); setShowResults(true) }}
+        >
+          <Search className="h-5 w-5" />
+        </Button>
+      </div>
+
+      {/* 모바일 검색 오버레이 */}
+      {showMobileSearch && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur p-4 md:hidden">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="search"
+                placeholder="인스턴스, VM 검색..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setShowMobileSearch(false)
+                    setShowResults(false)
+                    setQuery("")
+                  }
+                  if (e.key === "Enter" && filtered.length === 1) {
+                    router.push(`/instances/${filtered[0].vmid}?node=${filtered[0].node}`)
+                    setShowMobileSearch(false)
+                    setShowResults(false)
+                    setQuery("")
+                  }
+                }}
+                className="flex h-9 w-full rounded-lg border border-input bg-card pl-10 pr-3 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowMobileSearch(false)
+                setShowResults(false)
+                setQuery("")
+              }}
+            >
+              취소
+            </Button>
+          </div>
+          {showResults && (
+            <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+              <SearchResultList
+                filtered={filtered}
+                onSelect={(vm) => {
+                  router.push(`/instances/${vm.vmid}?node=${vm.node}`)
+                  setShowMobileSearch(false)
+                  setShowResults(false)
+                  setQuery("")
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Search (데스크톱) */}
+      <div ref={searchRef} className="relative hidden md:block w-[24rem]">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
@@ -100,7 +198,7 @@ export function TopNavbar() {
           onKeyDown={(e) => {
             if (e.key === "Escape") setShowResults(false)
             if (e.key === "Enter" && filtered.length === 1) {
-              router.push(`/instances/${filtered[0].node}/${filtered[0].vmid}`)
+              router.push(`/instances/${filtered[0].vmid}?node=${filtered[0].node}`)
               setShowResults(false)
               setQuery("")
             }
@@ -109,32 +207,14 @@ export function TopNavbar() {
         />
         {showResults && (
           <div className="absolute top-full left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg z-50">
-            {filtered.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                검색 결과가 없습니다
-              </div>
-            ) : (
-              filtered.slice(0, 10).map((vm) => (
-                <button
-                  key={`${vm.node}-${vm.vmid}`}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-accent transition-colors"
-                  onClick={() => {
-                    router.push(`/instances/${vm.node}/${vm.vmid}`)
-                    setShowResults(false)
-                    setQuery("")
-                  }}
-                >
-                  <Monitor className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <span className="font-medium">{vm.name}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">VMID {vm.vmid}</span>
-                  </div>
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${
-                    vm.status === "running" ? "bg-green-500" : vm.status === "stopped" ? "bg-red-400" : "bg-yellow-400"
-                  }`} />
-                </button>
-              ))
-            )}
+            <SearchResultList
+              filtered={filtered}
+              onSelect={(vm) => {
+                router.push(`/instances/${vm.vmid}?node=${vm.node}`)
+                setShowResults(false)
+                setQuery("")
+              }}
+            />
           </div>
         )}
       </div>

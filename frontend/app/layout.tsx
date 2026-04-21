@@ -23,26 +23,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'GSM SV - Cloud Dashboard',
-  description: 'Manage your virtual machines and cloud infrastructure',
+  title: 'GSMSV',
+  description: '광주소프트웨어마이스터고등학교 교내 클라우드 플랫폼',
   generator: 'GSM SV Team',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
-  },
 }
 
 export default function RootLayout({

@@ -39,11 +39,13 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false)
 
   const passwordChecks = [
-    { label: "6자 이상", pass: newPassword.length >= 6 },
+    { label: "8자 이상", pass: newPassword.length >= 8 },
     { label: "영문 포함", pass: /[a-zA-Z]/.test(newPassword) },
     { label: "숫자 포함", pass: /\d/.test(newPassword) },
+    { label: "특수문자 포함", pass: /[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/~`]/.test(newPassword) },
   ]
   const passwordStrength = passwordChecks.filter((c) => c.pass).length
+  const passwordTotal = passwordChecks.length
 
   useEffect(() => {
     if (resendCooldown <= 0) return
@@ -139,7 +141,7 @@ export default function ResetPasswordPage() {
       setError("비밀번호가 일치하지 않습니다.")
       return
     }
-    if (passwordStrength < 3) {
+    if (passwordStrength < passwordTotal) {
       setError("비밀번호 조건을 모두 충족해주세요.")
       return
     }
@@ -337,16 +339,16 @@ export default function ResetPasswordPage() {
               {newPassword.length > 0 && (
                 <div className="space-y-2 pt-1">
                   <div className="flex gap-1.5">
-                    {[1, 2, 3].map((level) => (
+                    {Array.from({ length: passwordTotal }, (_, i) => i + 1).map((level) => (
                       <div
                         key={level}
                         className="h-1 flex-1 rounded-full transition-colors"
                         style={{
                           background:
                             passwordStrength >= level
-                              ? passwordStrength === 3
+                              ? passwordStrength === passwordTotal
                                 ? "var(--status-active-dot)"
-                                : passwordStrength === 2
+                                : passwordStrength >= passwordTotal - 1
                                 ? "var(--status-pending-dot)"
                                 : "var(--status-error-dot)"
                               : "var(--muted)",

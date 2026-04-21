@@ -7,7 +7,6 @@ import {
   HardDrive,
   Terminal,
   KeyRound,
-  Shield,
   FolderKanban,
   MessageCircleQuestion,
   ChevronRight,
@@ -43,14 +42,7 @@ const sections = [
     description: "SSH Key 생성, 등록, VS Code 설정",
     items: ["SSH Key 생성 방법", "VM에 공개키 등록", "VS Code Remote SSH 설정"],
   },
-  {
-    title: "방화벽 설정",
-    href: "/docs/firewall",
-    icon: Shield,
-    description: "인바운드 방화벽 규칙 추가, 삭제",
-    items: ["포트포워딩 구조", "규칙 추가 방법", "사용 예시 (IP 제한)"],
-  },
-  {
+{
     title: "프로젝트 오너",
     href: "/docs/project-owner",
     icon: FolderKanban,

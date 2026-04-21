@@ -1,12 +1,13 @@
 import json
-import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from core.timezone import now_kst
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel as _BM
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 from core.database import get_db
@@ -39,11 +40,9 @@ def _issue_tokens(user_id: int) -> dict:
     }
 
 
-from fastapi.responses import JSONResponse
-
 def _set_auth_cookies(response: JSONResponse, access_token: str, refresh_token: str):
     """httpOnly 쿠키에 JWT 토큰을 설정합니다."""
-    is_prod = "localhost" not in settings.FRONTEND_URL
+    is_prod = settings.FRONTEND_URL.startswith("https")
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -89,7 +88,13 @@ async def signup(request: Request, user_in: UserCreate, db: Session = Depends(ge
         raise HTTPException(status_code=400, detail="이미 일반 계정으로 가입된 이메일입니다.")
 
     # DataGSM API로 재학생 검증
-    student_info = await lookup_student_by_email(user_in.email)
+    try:
+        student_info = await lookup_student_by_email(user_in.email)
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="서버 오류입니다. 잠시 후 다시 시도해주세요.",
+        )
     if student_info is None:
         raise HTTPException(
             status_code=403,
@@ -140,7 +145,13 @@ async def check_project_eligibility(body: ProjectCheckRequest, db: Session = Dep
         raise HTTPException(status_code=400, detail="이미 프로젝트 오너로 가입된 이메일입니다.")
 
     # 재학생 검증
-    student_info = await lookup_student_by_email(body.email)
+    try:
+        student_info = await lookup_student_by_email(body.email)
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="서버 오류입니다. 잠시 후 다시 시도해주세요.",
+        )
     if student_info is None:
         raise HTTPException(
             status_code=403,
@@ -209,7 +220,13 @@ async def signup_project(body: ProjectSignupRequest, db: Session = Depends(get_d
         )
 
     # 재학생 + 프로젝트 참여 재확인
-    student_info = await lookup_student_by_email(body.email)
+    try:
+        student_info = await lookup_student_by_email(body.email)
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="서버 오류입니다. 잠시 후 다시 시도해주세요.",
+        )
     if student_info is None:
         raise HTTPException(status_code=403, detail="재학생 검증에 실패했습니다.")
 
@@ -642,8 +659,6 @@ async def confirm_password_reset(request: Request, body: PasswordResetConfirm, d
 
 # ── 비밀번호 변경 (로그인 상태) ─────────────────────────────
 
-from pydantic import BaseModel as _BM
-
 class ChangePasswordRequest(_BM):
     current_password: str
     new_password: str
@@ -675,9 +690,18 @@ async def change_password(
 
 AVATAR_DIR = Path("uploads/avatars")
 AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+AVATAR_DIR_RESOLVED = AVATAR_DIR.resolve()
 ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
 ALLOWED_AVATAR_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
+
+
+def _safe_avatar_path(avatar_url: str) -> Path | None:
+    """avatar_url을 안전한 로컬 경로로 변환. AVATAR_DIR 외부 경로는 None 반환."""
+    resolved = Path(avatar_url.lstrip("/")).resolve()
+    if not str(resolved).startswith(str(AVATAR_DIR_RESOLVED)):
+        return None
+    return resolved
 
 
 @router.post("/avatar")
@@ -694,10 +718,10 @@ async def upload_avatar(
     if len(contents) > MAX_AVATAR_SIZE:
         raise HTTPException(status_code=400, detail="파일 크기는 2MB 이하여야 합니다.")
 
-    # 기존 아바타 삭제
+    # 기존 아바타 삭제 (경로 순회 방지)
     if current_user.avatar_url:
-        old_path = Path(current_user.avatar_url.lstrip("/"))
-        if old_path.exists():
+        old_path = _safe_avatar_path(current_user.avatar_url)
+        if old_path and old_path.exists():
             old_path.unlink(missing_ok=True)
 
     # 저장 (확장자 화이트리스트)
@@ -724,8 +748,8 @@ async def delete_avatar(
 ):
     """프로필 사진 삭제"""
     if current_user.avatar_url:
-        old_path = Path(current_user.avatar_url.lstrip("/"))
-        if old_path.exists():
+        old_path = _safe_avatar_path(current_user.avatar_url)
+        if old_path and old_path.exists():
             old_path.unlink(missing_ok=True)
 
     current_user.avatar_url = None

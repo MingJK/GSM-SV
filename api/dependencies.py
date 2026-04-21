@@ -1,4 +1,3 @@
-from typing import Generator, Optional
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -72,14 +71,22 @@ def get_vm_with_owner_check(
     db: Session,
     vmid: int,
     current_user: User,
+    node: str = None,
 ):
     """
     DB에서 VM을 찾고 소유권을 확인하는 공통 헬퍼.
-    VM 레코드와 해당 서버 정보를 함께 반환합니다.
+    node가 주어지면 해당 서버의 VM만 조회하여 다른 노드의 동일 vmid 충돌을 방지합니다.
     """
     from models.vm import Vm
+    from models.server import Server
 
-    vm_record = db.query(Vm).filter(Vm.hypervisor_vmid == vmid).first()
+    query = db.query(Vm).filter(Vm.hypervisor_vmid == vmid)
+    if node:
+        query = query.join(Server).filter(Server.name == node)
+    elif current_user.role != UserRole.ADMIN:
+        # node 없이 vmid만으로 조회 시, 소유자 VM만 매칭 (동일 vmid 충돌 방지)
+        query = query.filter(Vm.owner_id == current_user.id)
+    vm_record = query.first()
     if not vm_record:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

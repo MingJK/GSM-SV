@@ -1,6 +1,6 @@
+import sys
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 
 class Settings(BaseSettings):
     """
@@ -131,12 +131,23 @@ class Settings(BaseSettings):
 # 싱글톤 패턴으로 설정 인스턴스 생성
 settings = Settings()
 
-# SECRET_KEY 미설정 시 서버 시작 차단
+# 필수 환경변수 검증 — 누락 시 서버 시작 차단
 if not settings.SECRET_KEY or settings.SECRET_KEY == "your-super-secret-key-change-this-in-production":
-    import sys
     print("❌ [FATAL] SECRET_KEY가 설정되지 않았습니다. .env 파일에 SECRET_KEY를 설정해주세요.")
     print("   예: SECRET_KEY=$(python -c \"import secrets; print(secrets.token_urlsafe(64))\")")
     sys.exit(1)
+
+_REQUIRED_VARS = {
+    "GATEWAY_IP": settings.GATEWAY_IP,
+    "GATEWAY_USER": settings.GATEWAY_USER,
+    "SMTP_USER": settings.SMTP_USER,
+    "SMTP_PASSWORD": settings.SMTP_PASSWORD,
+    "DATAGSM_API_KEY": settings.DATAGSM_API_KEY,
+}
+_missing = [k for k, v in _REQUIRED_VARS.items() if not v]
+if _missing:
+    print(f"⚠️  [WARNING] 다음 환경변수가 설정되지 않았습니다: {', '.join(_missing)}")
+    print("   일부 기능(VM 생성, 이메일 인증, 재학생 검증)이 동작하지 않을 수 있습니다.")
 
 if __name__ == "__main__":
     print("--- Loaded Configuration from .env ---")

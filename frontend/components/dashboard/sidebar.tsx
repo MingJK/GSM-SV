@@ -2,7 +2,9 @@
 
 import React, { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Image from "next/image"
+import { usePathname, useSearchParams } from "next/navigation"
+import gsmsvLogo from "@/public/gsmsv_logo.jpg"
 import { cn } from "@/lib/utils"
 import {
   Server,
@@ -17,17 +19,21 @@ import {
   HardDrive,
   Terminal,
   KeyRound,
-  Shield,
+  Cpu,
   FolderKanban,
   MessageCircleQuestion,
   MessageSquarePlus,
   ChevronDown,
+  UserCheck,
+  X,
 } from "lucide-react"
 import { getMyVms, getAllVms, type VmInfo, type AdminNodeVms } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 
 type NavItemData = {
   title: string
+  label?: React.ReactNode
   href: string
   icon: React.ComponentType<{ className?: string }>
   external?: boolean
@@ -47,10 +53,10 @@ const docCategories: DocCategory[] = [
     children: [
       { title: "인스턴스", href: "/docs/instances", icon: HardDrive },
       { title: "접속 방법", href: "/docs/access", icon: Terminal },
+      { title: "SSH Key 등록", label: <>SSH Key<br />등록</>, href: "/docs/ssh-key", icon: KeyRound },
+      { title: "Public IP / GPU 안내", href: "/docs/advanced-resources", icon: Cpu },
     ],
   },
-  { title: "SSH Key 등록", href: "/docs/ssh-key", icon: KeyRound },
-  { title: "방화벽 설정", href: "/docs/firewall", icon: Shield },
   { title: "FAQ", href: "/docs/faq", icon: MessageCircleQuestion },
   { title: "질문 등록", href: "/docs/questions", icon: MessageSquarePlus },
 ]
@@ -77,7 +83,7 @@ function SlidingIndicator({ style }: { style: IndicatorStyle }) {
       style={{
         top: style.top,
         height: style.height,
-        transition: "top 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease",
+        transition: "top 0.15s cubic-bezier(0.4, 0, 0.2, 1), height 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease",
         opacity: style.visible ? 1 : 0,
         width: "calc(100% - 8px)",
         marginLeft: "8px",
@@ -136,8 +142,8 @@ function VmStatusDot({ status }: { status: string }) {
     status === "running"
       ? "bg-[var(--status-active-dot)]"
       : status === "stopped"
-      ? "bg-[var(--status-stopped-dot)]"
-      : "bg-[var(--status-pending-dot)]"
+        ? "bg-[var(--status-stopped-dot)]"
+        : "bg-[var(--status-pending-dot)]"
 
   return (
     <span
@@ -152,8 +158,16 @@ function VmStatusDot({ status }: { status: string }) {
 
 // ── Sidebar 본체 ─────────────────────────────────────────────
 
-export function Sidebar() {
+export function Sidebar({
+  mobileOpen = false,
+  onMobileClose,
+}: {
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+}) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentNode = searchParams.get("node")
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
 
@@ -207,24 +221,43 @@ export function Sidebar() {
 
   const isItemActive = (href: string) => {
     if (href === "#") return false
+    // /instances는 VM 상세(/instances/123)와 겹치지 않도록 정확 매칭만
+    if (href === "/instances") return pathname === "/instances"
     return pathname === href || pathname.startsWith(href + "/")
   }
 
   // 인디케이터 대상: 메인 메뉴 + VM 목록만 (문서는 제외)
-  const allVmHrefs = isAdmin
-    ? adminNodes.flatMap((n) => n.vms.map((vm) => `/instances/${vm.vmid}`))
+  // 어드민은 node:vmid 조합으로 고유 식별 (같은 vmid가 다른 노드에 존재 가능)
+  const allVmKeys = isAdmin
+    ? adminNodes.flatMap((n) => n.vms.map((vm) => `${n.name}:/instances/${vm.vmid}`))
     : vms.map((vm) => `/instances/${vm.vmid}`)
   const indicatorHrefs = [
     ...mainNavItems.map((i) => i.href),
-    ...allVmHrefs,
+    ...(isAdmin ? ["/admin/approvals"] : []),
+    ...allVmKeys,
   ]
-  const activeHref = indicatorHrefs.find((href) => isItemActive(href))
+  const activeHref = indicatorHrefs.find((key) => {
+    if (key.includes(":/instances/")) {
+      const [node, href] = key.split(":")
+      return isItemActive(href) && currentNode === node
+    }
+    return isItemActive(key)
+  })
 
   // 인디케이터 위치 계산
   const updateIndicator = useCallback(() => {
     if (!activeHref || !navContainerRef.current) {
       setIndicator((prev) => ({ ...prev, visible: false }))
       return
+    }
+
+    // 접힌 노드 안의 VM이면 숨김
+    if (activeHref.includes(":/instances/")) {
+      const [node] = activeHref.split(":")
+      if (!expandedNodes.has(node)) {
+        setIndicator((prev) => ({ ...prev, visible: false }))
+        return
+      }
     }
 
     const el = itemRefs.current.get(activeHref)
@@ -240,15 +273,28 @@ export function Sidebar() {
     if (elRect.height === 0) return
 
     setIndicator({
-      top: elRect.top - containerRect.top,
+      top: elRect.top - containerRect.top + container.scrollTop,
       height: elRect.height,
       visible: true,
     })
-  }, [activeHref])
+  }, [activeHref, expandedNodes])
 
   useLayoutEffect(() => {
-    updateIndicator()
-  }, [updateIndicator, pathname, vms])
+    let rafId: number
+    let startTime: number | null = null
+    const duration = 320
+
+    const loop = (time: number) => {
+      if (startTime === null) startTime = time
+      updateIndicator()
+      if (time - startTime < duration) {
+        rafId = requestAnimationFrame(loop)
+      }
+    }
+
+    rafId = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(rafId)
+  }, [updateIndicator, pathname, vms, adminNodes, currentNode, expandedNodes, docsOpen])
 
   useEffect(() => {
     window.addEventListener("resize", updateIndicator)
@@ -268,21 +314,18 @@ export function Sidebar() {
 
   const isDocsActive = pathname.startsWith("/docs")
 
-  return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-52 bg-sidebar">
-      <div className="flex h-full flex-col">
+  const makeSidebarContent = (withRefs: boolean) => (
+    <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2.5 px-4 mt-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-neutral-800 dark:bg-neutral-600">
-            <LayoutDashboard className="h-4.5 w-4.5 text-white" />
-          </div>
+          <Image src={gsmsvLogo} alt="GSMSV" width={36} height={36} className="rounded-xl dark:invert" />
           <span className="text-base font-semibold text-sidebar-foreground">
             GSM SV
           </span>
         </div>
 
         {/* Navigation */}
-        <nav ref={navContainerRef} className="relative flex-1 overflow-hidden py-4">
+        <nav ref={withRefs ? navContainerRef : undefined} className="relative flex-1 overflow-y-auto overflow-x-hidden py-4 sidebar-scroll">
           <SlidingIndicator style={indicator} />
 
           {/* 메뉴 */}
@@ -296,7 +339,7 @@ export function Sidebar() {
                   key={item.title}
                   item={item}
                   isActive={isItemActive(item.href)}
-                  itemRef={getItemRef(item.href)}
+                  itemRef={withRefs ? getItemRef(item.href) : () => {}}
                 />
               ))}
             </div>
@@ -393,7 +436,7 @@ export function Sidebar() {
                                     )}
                                   >
                                     <ChildIcon className={cn("h-3.5 w-3.5 shrink-0 transition-colors", childIsActive ? "text-white" : "")} />
-                                    <span>{child.title}</span>
+                                    <span>{child.label ?? child.title}</span>
                                   </Link>
                                 </div>
                               )
@@ -407,6 +450,22 @@ export function Sidebar() {
               </div>
             </div>
           </div>
+
+          {/* 어드민: 승인 관리 */}
+          {isAdmin && (
+            <div className="mb-6">
+              <p className="mb-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Admin
+              </p>
+              <div className="space-y-0.5">
+                <NavItem
+                  item={{ title: "가입 승인", href: "/admin/approvals", icon: UserCheck }}
+                  isActive={isItemActive("/admin/approvals")}
+                  itemRef={withRefs ? getItemRef("/admin/approvals") : () => {}}
+                />
+              </div>
+            </div>
+          )}
 
           {/* 어드민: NODES / 일반: MY VM */}
           {isAdmin ? (
@@ -451,15 +510,17 @@ export function Sidebar() {
                         ) : (
                           node.vms.map((vm) => {
                             const href = `/instances/${vm.vmid}`
-                            const active = pathname === href || pathname.startsWith(href + "/")
+                            const vmKey = `${vm.node}:${href}`
+                            const active = (pathname === href || pathname.startsWith(href + "/")) && currentNode === vm.node
                             return (
                               <div
                                 key={`${vm.node}-${vm.vmid}`}
-                                ref={getItemRef(href)}
+                                ref={withRefs ? getItemRef(vmKey) : undefined}
                                 className="relative"
                               >
                                 <Link
                                   href={`${href}?node=${vm.node}`}
+                                  title={`${vm.name}${vm.owner_email ? ` (${vm.owner_email.split("@")[0]})` : ""}`}
                                   className={cn(
                                     "flex items-center gap-3 pl-10 pr-3 py-2 text-[13px] font-medium rounded-lg transition-all duration-200 z-[1] relative",
                                     active
@@ -509,7 +570,7 @@ export function Sidebar() {
                     return (
                       <div
                         key={`${vm.node}-${vm.vmid}`}
-                        ref={getItemRef(href)}
+                        ref={withRefs ? getItemRef(href) : undefined}
                         className="relative"
                       >
                         <Link
@@ -563,7 +624,27 @@ export function Sidebar() {
             })}
           </div>
         </div>
-      </div>
-    </aside>
+    </div>
+  )
+
+  return (
+    <>
+      <aside className="fixed left-0 top-0 z-40 h-screen w-52 bg-sidebar hidden md:block">
+        {makeSidebarContent(true)}
+      </aside>
+      <Sheet open={mobileOpen} onOpenChange={(open) => !open && onMobileClose?.()}>
+        <SheetContent side="left" className="w-52 p-0 bg-sidebar border-r border-sidebar-border [&>button]:hidden">
+          <SheetTitle className="sr-only">사이드바 메뉴</SheetTitle>
+          <button
+            onClick={onMobileClose}
+            className="absolute right-2 top-2 z-50 rounded-sm p-1 text-sidebar-foreground opacity-70 hover:opacity-100"
+            aria-label="닫기"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          {makeSidebarContent(false)}
+        </SheetContent>
+      </Sheet>
+    </>
   )
 }

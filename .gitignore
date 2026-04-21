@@ -32,14 +32,16 @@ backups/
 # 업로드 파일 (아바타 등 사용자 콘텐츠)
 uploads/
 
+# Docker
+Dockerfile
+frontend/Dockerfile
+docker-compose.yml
+.dockerignore
+frontend/.dockerignore
+nginx/
+
 # Claude
 .claude/
 CLAUDE.md
 
-# 인프라 설정 (로컬 배포용)
-Dockerfile
-docker-compose.yml
-.dockerignore
-frontend/Dockerfile
-frontend/.dockerignore
-nginx/
+/docs/

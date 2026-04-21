@@ -1,9 +1,10 @@
 import logging
+import re
 import string
 import secrets
 import time
 import paramiko
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from core.timezone import now_kst
 
 from fastapi import HTTPException, status
@@ -33,15 +34,25 @@ def _generate_password(length: int = 8) -> str:
     return password
 
 
+def _sanitize_dns_name(name: str) -> str:
+    """문자열을 DNS 호환 이름으로 변환 (소문자 + 숫자 + 하이픈만 허용)"""
+    name = name.lower()
+    name = re.sub(r"[^a-z0-9-]", "-", name)  # 허용되지 않는 문자 → 하이픈
+    name = re.sub(r"-+", "-", name)           # 연속 하이픈 제거
+    name = name.strip("-")                    # 앞뒤 하이픈 제거
+    return name or "vm"                       # 빈 문자열 방지 (비ASCII 이메일 등)
+
+
 def _generate_vm_name(user: User, tier: str, custom_name: str = None) -> tuple[str, str]:
     """
     VM 이름 생성 → (proxmox_name, display_name) 튜플 반환
     - custom_name이 있으면: test1-myvm / myvm
     - 없으면 자동 생성:    test1-micro-a3f2 / micro-a3f2
     """
-    username = user.email.split("@")[0]
+    username = _sanitize_dns_name(user.email.split("@")[0])
     if custom_name:
-        return f"{username}-{custom_name}", custom_name
+        safe_name = _sanitize_dns_name(custom_name)
+        return f"{username}-{safe_name}", custom_name
     suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(4))
     short = f"{tier}-{suffix}"
     return f"{username}-{short}", short
@@ -109,8 +120,9 @@ runcmd:
   - ip link set dev eth0 mtu 1400
   - netplan apply
   - echo "root:{root_password}" | chpasswd
-  - echo -e "PasswordAuthentication yes\\nPermitRootLogin no" > /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
+  - printf "PasswordAuthentication yes\\nPermitRootLogin no\\nMaxAuthTries 5\\n" > /etc/ssh/sshd_config.d/99-gsmsv.conf
   - systemctl restart ssh
+  - sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.kakao.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirror.kakao.com/ubuntu|g' /etc/apt/sources.list
   - apt update
   - apt install -y qemu-guest-agent
   - systemctl enable --now qemu-guest-agent
@@ -135,6 +147,7 @@ def _upload_snippet(server: Server, filename: str, content: str):
             timeout=10,
         )
         sftp = ssh.open_sftp()
+        sftp.get_channel().settimeout(15)  # SFTP 작업 타임아웃
         remote_path = f"{SNIPPETS_DIR}/{filename}"
         with sftp.file(remote_path, "w") as f:
             f.write(content)
@@ -168,17 +181,50 @@ def _delete_snippet(server: Server, filename: str):
         ssh.close()
 
 
-def _wait_for_clone(proxmox, node_name: str, vmid: int, timeout: int = 60):
-    """클론 태스크가 완료될 때까지 대기합니다."""
+def _wait_for_clone(proxmox, node_name: str, vmid: int, timeout: int = 120, upid: str = None):
+    """클론 태스크가 완료될 때까지 대기합니다.
+
+    upid가 주어지면 Proxmox 태스크 상태를 직접 폴링합니다.
+    태스크 완료 후 lock 해제까지 추가 대기합니다.
+    """
     deadline = time.time() + timeout
+    delay = 1
+
+    # ── UPID 기반 태스크 완료 대기 ──
+    if upid:
+        while time.time() < deadline:
+            try:
+                task = proxmox.nodes(node_name).tasks(upid).status.get()
+                task_status = task.get("status", "")
+                if task_status == "stopped":
+                    exit_status = task.get("exitstatus", "")
+                    if exit_status != "OK":
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"VM {vmid} 클론 실패: {exit_status}",
+                        )
+                    break  # 태스크 완료 → lock 해제 대기로 진행
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+            time.sleep(min(delay, max(0, deadline - time.time())))
+            delay = min(delay * 2, 5)
+        else:
+            raise HTTPException(status_code=500, detail=f"VM {vmid} 클론 타임아웃 ({timeout}초)")
+
+    # ── lock 해제 대기 (클론 완료 후에도 잠시 lock이 남을 수 있음) ──
+    delay = 0.5
     while time.time() < deadline:
         try:
-            # VM config를 읽을 수 있으면 클론 완료
-            proxmox.nodes(node_name).qemu(vmid).config.get()
-            return
+            config = proxmox.nodes(node_name).qemu(vmid).config.get()
+            if not config.get("lock"):
+                return  # lock 해제됨 → 안전하게 후속 작업 가능
         except Exception:
-            time.sleep(2)
-    raise HTTPException(status_code=500, detail=f"VM {vmid} 클론 타임아웃 ({timeout}초)")
+            pass
+        time.sleep(min(delay, max(0, deadline - time.time())))
+        delay = min(delay * 2, 3)
+    raise HTTPException(status_code=500, detail=f"VM {vmid} lock 해제 타임아웃 ({timeout}초)")
 
 
 # ── VM 생성 ─────────────────────────────────────────────────
@@ -293,18 +339,20 @@ def create_vm(
     vmid = _get_next_vmid(proxmox, server.name)
     vm_name, vm_display_name = _generate_vm_name(current_user, tier.value, custom_name=name)
     vm_password = _generate_password()
+    clone_started = False  # clone 시작 여부 추적
 
     try:
         # 5. 템플릿 Full Clone
-        proxmox.nodes(server.name).qemu(template_vmid).clone.post(
+        clone_upid = proxmox.nodes(server.name).qemu(template_vmid).clone.post(
             newid=vmid,
             name=vm_name,
             full=1,                     # full clone (linked clone이 아닌 독립 디스크)
             target=server.name,
         )
+        clone_started = True
 
-        # 클론 완료 대기
-        _wait_for_clone(proxmox, server.name, vmid)
+        # 클론 태스크 완료 + lock 해제 대기
+        _wait_for_clone(proxmox, server.name, vmid, upid=clone_upid)
 
         # 6. Cloud-Init 설정 주입 (VM별 동적 스니펫)
         #    템플릿에는 cicustom 없음 → 클론 후 동적 스니펫 생성 → cicustom user= 적용
@@ -330,15 +378,11 @@ def create_vm(
             "sockets": 1,
         }
 
-        # 프로젝트 커스텀 티어: 핫플러그 활성화 (소켓 기반 CPU 변경, NUMA 필수)
+        # 프로젝트 커스텀 티어: 핫플러그 활성화 (소켓 1 고정, cores로 vCPU 조절)
         if tier == VMTierEnum.PROJECT_CUSTOM:
             config_params["hotplug"] = "cpu,memory"
             config_params["balloon"] = specs["memory"] // 2
             config_params["numa"] = 1
-            # 소켓 기반: cores=2 고정, sockets로 총 vCPU 조절 (2,4,6,8)
-            sockets = max(1, specs["cores"] // 2)
-            config_params["cores"] = 2
-            config_params["sockets"] = sockets
 
         proxmox.nodes(server.name).qemu(vmid).config.put(**config_params)
 
@@ -429,10 +473,23 @@ def create_vm(
         raise
     except Exception as e:
         # 실패 시 생성된 VM + 스니펫 정리 시도
-        try:
-            proxmox.nodes(server.name).qemu(vmid).delete()
-        except Exception:
-            logger.warning(f"VM {vmid} 생성 실패 후 정리 중 오류 (수동 확인 필요)")
+        if clone_started:
+            try:
+                # lock이 남아있으면 삭제 불가 → lock 해제까지 대기 후 삭제
+                for _ in range(10):
+                    try:
+                        config = proxmox.nodes(server.name).qemu(vmid).config.get()
+                        if config.get("lock"):
+                            logger.info(f"VM {vmid} lock 대기 중 (정리 전)...")
+                            time.sleep(3)
+                            continue
+                    except Exception:
+                        time.sleep(3)
+                        continue
+                    break
+                proxmox.nodes(server.name).qemu(vmid).delete(purge=1)
+            except Exception:
+                logger.warning(f"VM {vmid} 생성 실패 후 정리 중 오류 (수동 확인 필요)")
         try:
             _delete_snippet(server, f"user-data-{vmid}.yaml")
         except Exception:

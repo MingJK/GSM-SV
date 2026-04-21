@@ -5,7 +5,9 @@ import { useAuth } from "@/lib/auth-context"
 import { ApiError } from "@/lib/api"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { LayoutDashboard, Eye, EyeOff, Loader2, Sun, Moon } from "lucide-react"
+import Image from "next/image"
+import { Eye, EyeOff, Loader2, Sun, Moon } from "lucide-react"
+import gsmsvLogo from "@/public/gsmsv_logo.jpg"
 import { useTheme } from "next-themes"
 
 export default function LoginPage() {
@@ -70,13 +72,11 @@ function LoginContent() {
       <div className="w-full max-w-[420px] space-y-8">
         {/* 로고 + 헤더 */}
         <div className="flex flex-col items-center space-y-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-            <LayoutDashboard className="h-7 w-7 text-muted-foreground" />
-          </div>
+          <Image src={gsmsvLogo} alt="GSMSV" width={56} height={56} className="rounded-2xl dark:invert" />
           <div className="text-center space-y-1">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">로그인</h1>
             <p className="text-sm text-muted-foreground">
-              DataGSM 계정으로 로그인하세요
+              GSMSV 계정으로 로그인하세요
             </p>
           </div>
         </div>
@@ -94,7 +94,7 @@ function LoginContent() {
           <button
             type="button"
             onClick={() => { setLoginRole("user"); setError(""); }}
-            className={`relative z-10 flex-1 rounded-lg py-2 text-sm font-medium transition-colors duration-200 ${
+            className={`relative z-10 flex-1 rounded-lg py-2 text-sm font-medium cursor-pointer transition-colors duration-200 ${
               loginRole === "user"
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -105,7 +105,7 @@ function LoginContent() {
           <button
             type="button"
             onClick={() => { setLoginRole("project_owner"); setError(""); }}
-            className={`relative z-10 flex-1 rounded-lg py-2 text-sm font-medium transition-colors duration-200 ${
+            className={`relative z-10 flex-1 rounded-lg py-2 text-sm font-medium cursor-pointer transition-colors duration-200 ${
               loginRole === "project_owner"
                 ? "text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -168,7 +168,7 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -178,7 +178,7 @@ function LoginContent() {
           <button
             type="submit"
             disabled={loading}
-            className="relative flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-foreground text-sm font-semibold text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden fast-theme"
+            className="relative flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-foreground text-sm font-semibold text-background hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden fast-theme"
           >
             {loading ? (
               <>
@@ -204,7 +204,7 @@ function LoginContent() {
 
           <a
             href="/api/v1/oauth/authorize"
-            className="flex h-12 w-full items-center justify-center gap-4 rounded-xl border border-[#E5E5E5] bg-[#EFEFEF] text-black text-sm font-medium hover:bg-[#E5E5E5] transition-all duration-200 dark:bg-[#2A2A2A] dark:text-white dark:border-[#3A3A3A] dark:hover:bg-[#333]"
+            className="flex h-12 w-full items-center justify-center gap-4 rounded-xl border border-[#E5E5E5] bg-[#EFEFEF] text-black text-sm font-medium hover:bg-[#E5E5E5] cursor-pointer transition-all duration-200 dark:bg-[#2A2A2A] dark:text-white dark:border-[#3A3A3A] dark:hover:bg-[#333]"
           >
             <svg className="h-[0.92rem] dark:hidden" viewBox="0 0 38 14" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M11.0137 0.00292969C14.8268 0.0772199 17.8954 3.18059 17.8955 7C17.8955 10.8195 14.8269 13.9218 11.0137 13.9961V14H0V10.1572H11.0127V10.1533C12.6967 10.0805 14.0399 8.69776 14.04 7.00098C14.04 5.30405 12.6968 3.91948 11.0127 3.84668V3.84375H4.60742L4.6084 3.84277H0V0H11.0137V0.00292969Z" fill="currentColor"/>

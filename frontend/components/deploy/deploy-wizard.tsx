@@ -45,13 +45,6 @@ const osOptions = [
     icon: "/os_ubuntu.png",
     tag: "추천",
   },
-  {
-    id: "windows-server",
-    name: "Windows Server",
-    desc: "Windows 기반 서버 환경",
-    icon: "/os_windows.png",
-    tag: null,
-  },
 ]
 
 const nodeOptions = [
@@ -160,7 +153,7 @@ export function DeployWizard() {
     try {
       const res = await createVm({
         tier: selectedTier as "micro" | "small" | "medium" | "large" | "project_custom",
-        os: selectedOs as "ubuntu2204" | "windows-server",
+        os: selectedOs as "ubuntu2204",
         node_name: selectedNode,
         name: hostname || undefined,
         ...(isCustomTier && {
@@ -200,7 +193,7 @@ export function DeployWizard() {
         <CardContent className="space-y-6">
           <div className="rounded-lg border p-4 space-y-3">
             <h4 className="font-semibold">접속 정보</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">노드</p>
                 <p className="font-mono font-medium">{result.assigned_node}</p>
@@ -244,9 +237,24 @@ export function DeployWizard() {
   }
 
   return (
+    <div>
+      {/* 모바일 프로그레스 — lg 이상에서 숨김 */}
+      <div className="lg:hidden mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium text-foreground">Step {currentStep}/{steps.length}</span>
+          <span className="text-sm text-muted-foreground">{steps[currentStep - 1].name}</span>
+        </div>
+        <div className="w-full bg-muted rounded-full h-1.5">
+          <div
+            className="bg-primary h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${(currentStep / steps.length) * 100}%` }}
+          />
+        </div>
+      </div>
+
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      {/* Steps Sidebar */}
-      <Card className="lg:col-span-1 h-fit">
+      {/* Steps Sidebar — 모바일 숨김 */}
+      <Card className="hidden lg:block lg:col-span-1 h-fit">
         <CardContent className="p-4">
           <nav className="space-y-1">
             {steps.map((step) => {
@@ -583,7 +591,7 @@ export function DeployWizard() {
 
               <div className="space-y-3">
                 <h4 className="font-medium">구성 요약</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div className="space-y-1">
                     <p className="text-muted-foreground">운영체제</p>
                     <p className="font-medium">{selectedOsData?.name}</p>
@@ -662,6 +670,7 @@ export function DeployWizard() {
           )}
         </div>
       </div>
+    </div>
     </div>
   )
 }

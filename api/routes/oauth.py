@@ -18,7 +18,6 @@ from slowapi.util import get_remote_address
 
 from core.config import settings
 from core.database import get_db
-from core.timezone import now_kst
 from models.user import User, UserRole
 from core.security import create_access_token, create_refresh_token
 
@@ -93,7 +92,7 @@ async def oauth_callback(
     if not verifier:
         raise HTTPException(status_code=400, detail="유효하지 않은 state입니다. 다시 로그인해주세요.")
 
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         # 2. Authorization Code → Access Token 교환
         token_res = await client.post(
             f"{settings.DATAGSM_OAUTH_URL}/v1/oauth/token",
@@ -212,7 +211,7 @@ async def exchange_temp_code(body: TokenExchangeRequest):
     if not entry or entry["expires"] < time.time():
         raise HTTPException(status_code=400, detail="유효하지 않거나 만료된 코드입니다.")
 
-    is_prod = "localhost" not in settings.FRONTEND_URL
+    is_prod = settings.FRONTEND_URL.startswith("https")
     response = JSONResponse(content={"message": "ok"})
     response.set_cookie(
         key="access_token",

@@ -13,6 +13,7 @@ const API_BASE = "/api/v1";
 let refreshPromise: Promise<boolean> | null = null;
 
 async function refreshAccessToken(): Promise<boolean> {
+  // 이미 진행 중인 갱신이 있으면 그 결과를 대기 (중복 호출 방지)
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -26,12 +27,15 @@ async function refreshAccessToken(): Promise<boolean> {
       return res.ok;
     } catch {
       return false;
-    } finally {
-      refreshPromise = null;
     }
   })();
 
-  return refreshPromise;
+  try {
+    return await refreshPromise;
+  } finally {
+    // 모든 대기자가 결과를 받은 후에 리셋
+    refreshPromise = null;
+  }
 }
 
 // ── 범용 fetch 래퍼 ─────────────────────────────────────────
@@ -235,6 +239,32 @@ export async function logout() {
   await api("/auth/logout", { method: "POST" }).catch(() => {});
 }
 
+// ── 어드민: 프로젝트 오너 승인 ──────────────────────────────
+
+export interface PendingApproval {
+  id: number;
+  email: string;
+  name?: string;
+  grade?: number;
+  class_num?: number;
+  number?: number;
+  major?: string;
+  project_name?: string;
+  project_reason?: string;
+}
+
+export async function getPendingApprovals(): Promise<PendingApproval[]> {
+  return api<PendingApproval[]>("/auth/pending-approvals");
+}
+
+export async function approveProjectOwner(userId: number): Promise<{ message: string }> {
+  return api<{ message: string }>(`/auth/approve/${userId}`, { method: "POST" });
+}
+
+export async function rejectProjectOwner(userId: number): Promise<{ message: string }> {
+  return api<{ message: string }>(`/auth/reject/${userId}`, { method: "POST" });
+}
+
 // ── VM API ──────────────────────────────────────────────────
 
 export interface VmInfo {
@@ -255,7 +285,7 @@ export interface VmInfo {
 
 export interface VmCreateRequest {
   tier: "micro" | "small" | "medium" | "large" | "project_custom";
-  os: "ubuntu2204" | "windows-server";
+  os: "ubuntu2204";
   node_name?: string;
   name?: string;
   custom_cores?: number;
