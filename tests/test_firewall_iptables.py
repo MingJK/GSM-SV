@@ -7,7 +7,7 @@
 """
 import socket
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from models.vm_port import VmPort
 from services.network_service import allocate_random_port, manage_custom_iptables
 
@@ -212,9 +212,9 @@ class TestManageCustomIptablesManual:
                 (self.GATEWAY_PUBLIC_IP, self.EXTERNAL_PORT), timeout=5
             )
             sock.close()
-            connected = True
+            connected = True  # noqa: F841
         except (ConnectionRefusedError, socket.timeout, OSError):
-            connected = True  # DNAT 성공 시 VM 내부 서비스에 따라 refused도 정상
+            connected = True  # noqa: F841 — DNAT 성공 시 VM 내부 서비스에 따라 refused도 정상
 
         # 규칙 삭제
         manage_custom_iptables(

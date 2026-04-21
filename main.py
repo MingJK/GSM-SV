@@ -16,7 +16,7 @@ from core.database import Base, engine, SessionLocal
 from core.init_servers import sync_servers
 from models.vm import Vm
 from models.notification import Notification
-from models.faq_question import FaqQuestion
+from models.faq_question import FaqQuestion  # noqa: F401 — create_all 자동 반영
 from models.vm_port import VmPort  # noqa: F401 — create_all 자동 반영
 
 
