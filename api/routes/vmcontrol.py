@@ -237,6 +237,7 @@ async def get_vm_status(
             "maxdisk": vm_status.get("maxdisk", 0),
             "uptime": vm_status.get("uptime", 0),
             "cpu": vm_status.get("cpu", 0),
+            "mem": vm_status.get("mem", 0),
             # DB 데이터
             "internal_ip": vm_record.internal_ip,
             "vm_password": vm_record.vm_password,
