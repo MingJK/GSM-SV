@@ -18,6 +18,7 @@ from models.vm import Vm
 from models.user import UserRole
 from models.notification import Notification
 from models.faq_question import FaqQuestion
+from models.vm_port import VmPort  # noqa: F401 — create_all 자동 반영
 
 
 import logging
