@@ -14,7 +14,7 @@ from models.vm import Vm
 from models.server import Server
 from models.user import User, UserRole
 from services.proxmox_client import get_proxmox_for_server
-from services.network_service import manage_iptables
+from services.network_service import manage_iptables, manage_custom_iptables, calculate_ports
 from models.notification import Notification
 
 logger = logging.getLogger(__name__)
@@ -351,17 +351,6 @@ def create_vm(
         # 8. iptables 포트포워딩 등록
         manage_iptables(server, vmid, internal_ip, action="ADD")
 
-        # 기본 방화벽 규칙 초기화 (22, 80, 10000 — source 0.0.0.0/0)
-        try:
-            for port in [22, 80, 10000]:
-                proxmox.nodes(server.name).qemu(vmid).firewall.rules.post(
-                    action="ACCEPT", type="in", proto="tcp",
-                    dport=str(port), source="0.0.0.0/0", enable=1,
-                )
-            proxmox.nodes(server.name).qemu(vmid).firewall.options.put(enable=1)
-        except Exception as e:
-            logger.warning(f"VM {vmid} 기본 방화벽 규칙 초기화 실패 (무시): {e}")
-
         # 9. VM 부팅
         proxmox.nodes(server.name).qemu(vmid).status.start.post()
 
@@ -396,6 +385,27 @@ def create_vm(
             expires_at=expires_at,
         )
         db.add(new_vm)
+        db.flush()  # new_vm.id 확보
+
+        # 기본 포트 3개를 VmPort로 저장 (방화벽 탭에서 조회/삭제 가능)
+        from models.vm_port import VmPort
+        default_ports = calculate_ports(server.base_port, vmid)
+        for internal_port, protocol, description, external_port in [
+            (22,    "tcp",     "SSH",  default_ports["ssh"]),
+            (80,    "tcp",     "HTTP", default_ports["svc1"]),
+            (10000, "tcp/udp", "SVC",  default_ports["svc2"]),
+        ]:
+            db.add(VmPort(
+                vm_id=new_vm.id,
+                internal_port=internal_port,
+                external_port=external_port,
+                protocol=protocol,
+                action="ACCEPT",
+                source="0.0.0.0/0",
+                description=description,
+                is_default=True,
+            ))
+
         db.add(Notification(
             user_id=current_user.id,
             type="success",
@@ -466,9 +476,31 @@ def delete_vm(
         delete_params = {"purge": 1} if purge else {}
         proxmox.nodes(server.name).qemu(vmid).delete(**delete_params)
 
-        # iptables 규칙 제거
+        # 커스텀 포트 iptables 규칙 제거
+        from models.vm_port import VmPort
+        if vm_record.internal_ip:
+            custom_ports = db.query(VmPort).filter(
+                VmPort.vm_id == vm_record.id,
+                VmPort.is_default == False,  # noqa: E712
+            ).all()
+            for port in custom_ports:
+                protocols = ["tcp", "udp"] if port.protocol == "tcp/udp" else [port.protocol]
+                for proto in protocols:
+                    manage_custom_iptables(
+                        server=server,
+                        vm_ip=vm_record.internal_ip,
+                        internal_port=port.internal_port,
+                        external_port=port.external_port,
+                        protocol=proto,
+                        action="DELETE",
+                    )
+
+        # 기본 포트 iptables 규칙 제거
         if vm_record.internal_ip:
             manage_iptables(server, vmid, vm_record.internal_ip, action="DELETE")
+
+        # VmPort 레코드 일괄 삭제 (VM record 삭제 전 FK 제약 해소)
+        db.query(VmPort).filter(VmPort.vm_id == vm_record.id).delete()
 
         owner_id = vm_record.owner_id
         vm_name = vm_record.name
