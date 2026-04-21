@@ -15,6 +15,8 @@ from api.dependencies import get_current_user, get_vm_with_owner_check
 class VmPortCreate(BaseModel):
     internal_port: int
     protocol: str = "tcp"
+    action: str = "ACCEPT"
+    source: Optional[str] = None
     description: Optional[str] = None
 
 logger = logging.getLogger(__name__)
@@ -103,7 +105,10 @@ async def get_custom_ports(
                 "internal_port": p.internal_port,
                 "external_port": p.external_port,
                 "protocol": p.protocol,
+                "action": p.action,
+                "source": p.source,
                 "description": p.description,
+                "is_default": p.is_default,
             }
             for p in ports
         ],
@@ -120,7 +125,6 @@ async def add_custom_port(
     """커스텀 포트 추가 — 30000~39999 랜덤 외부 포트 할당 + iptables + Proxmox 방화벽 규칙"""
     vm = get_vm_with_owner_check(db, vmid, current_user)
     server = vm.server
-    proxmox = get_proxmox_for_server(server)
 
     try:
         external_port = allocate_random_port(db)
@@ -138,26 +142,14 @@ async def add_custom_port(
             action="ADD",
         )
 
-    # Proxmox 방화벽 규칙 추가
-    try:
-        proxmox.nodes(server.name).qemu(vmid).firewall.rules.post(
-            action="ACCEPT",
-            type="in",
-            proto=body.protocol,
-            dport=str(body.internal_port),
-            source="0.0.0.0/0",
-            enable=1,
-            comment=body.description or "",
-        )
-    except Exception as e:
-        logger.error(f"[firewall] 커스텀 포트 Proxmox 규칙 추가 실패: {e}")
-
     # DB 저장
     vm_port = VmPort(
         vm_id=vm.id,
         internal_port=body.internal_port,
         external_port=external_port,
         protocol=body.protocol,
+        action=body.action,
+        source=body.source,
         description=body.description,
     )
     db.add(vm_port)
@@ -180,35 +172,26 @@ async def delete_custom_port(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """커스텀 포트 삭제 — iptables + Proxmox 방화벽 규칙 삭제 + DB 삭제"""
+    """커스텀 포트 삭제 — iptables 제거 + DB 삭제"""
     vm = get_vm_with_owner_check(db, vmid, current_user)
     server = vm.server
-    proxmox = get_proxmox_for_server(server)
 
     vm_port = db.query(VmPort).filter(VmPort.id == port_id, VmPort.vm_id == vm.id).first()
     if not vm_port:
         raise HTTPException(status_code=404, detail="포트를 찾을 수 없습니다.")
 
-    # iptables 규칙 삭제
+    # iptables 규칙 삭제 ("tcp/udp" 프로토콜은 두 번 호출)
     if vm.internal_ip:
-        manage_custom_iptables(
-            server=server,
-            vm_ip=vm.internal_ip,
-            internal_port=vm_port.internal_port,
-            external_port=vm_port.external_port,
-            protocol=vm_port.protocol,
-            action="DELETE",
-        )
-
-    # Proxmox 방화벽 규칙 삭제 (dport 매칭)
-    try:
-        rules = proxmox.nodes(server.name).qemu(vmid).firewall.rules.get()
-        for rule in rules:
-            if str(rule.get("dport")) == str(vm_port.internal_port) and rule.get("proto") == vm_port.protocol:
-                proxmox.nodes(server.name).qemu(vmid).firewall.rules(rule["pos"]).delete()
-                break
-    except Exception as e:
-        logger.error(f"[firewall] 커스텀 포트 Proxmox 규칙 삭제 실패: {e}")
+        protocols = ["tcp", "udp"] if vm_port.protocol == "tcp/udp" else [vm_port.protocol]
+        for proto in protocols:
+            manage_custom_iptables(
+                server=server,
+                vm_ip=vm.internal_ip,
+                internal_port=vm_port.internal_port,
+                external_port=vm_port.external_port,
+                protocol=proto,
+                action="DELETE",
+            )
 
     db.delete(vm_port)
     db.commit()
