@@ -89,18 +89,22 @@ async def get_custom_ports(
     """커스텀 포트 목록 조회 (DB) — 기본 포트 레코드가 없으면 자동 생성"""
     vm = get_vm_with_owner_check(db, vmid, current_user, node=node)
 
-    has_defaults = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(True)).first()
-    if not has_defaults:
+    _DEFAULT_PORTS = [
+        (22,    "tcp",     "SSH",  "ssh"),
+        (80,    "tcp",     "HTTP", "svc1"),
+        (10000, "tcp/udp", "SVC",  "svc2"),
+    ]
+    existing_default_ports = {
+        p.internal_port
+        for p in db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(True)).all()
+    }
+    missing_defaults = [(ip, proto, desc, key) for ip, proto, desc, key in _DEFAULT_PORTS if ip not in existing_default_ports]
+
+    if missing_defaults:
         server = vm.server
-        # 기본 포트가 모두 삭제된 경우 iptables 규칙도 함께 복원
-        if vm.internal_ip:
-            manage_iptables(server, vmid, vm.internal_ip, action="ADD")
         default_port_map = calculate_ports(server.base_port, vmid)
-        for internal_port, protocol, description, external_port in [
-            (22,    "tcp",     "SSH",  default_port_map["ssh"]),
-            (80,    "tcp",     "HTTP", default_port_map["svc1"]),
-            (10000, "tcp/udp", "SVC",  default_port_map["svc2"]),
-        ]:
+        for internal_port, protocol, description, port_key in missing_defaults:
+            external_port = default_port_map[port_key]
             db.add(VmPort(
                 vm_id=vm.id,
                 internal_port=internal_port,
@@ -111,6 +115,16 @@ async def get_custom_ports(
                 description=description,
                 is_default=True,
             ))
+            if vm.internal_ip:
+                for proto in (["tcp", "udp"] if protocol == "tcp/udp" else [protocol]):
+                    manage_custom_iptables(
+                        server=server,
+                        vm_ip=vm.internal_ip,
+                        internal_port=internal_port,
+                        external_port=external_port,
+                        protocol=proto,
+                        action="ADD",
+                    )
         try:
             db.commit()
         except Exception as e:
