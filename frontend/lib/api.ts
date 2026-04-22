@@ -320,8 +320,8 @@ export async function getAllVms(): Promise<AdminNodeVms[]> {
   return res.nodes;
 }
 
-export async function getVmStatus(node: string, vmid: number) {
-  return api(`/vm/${node}/vms/${vmid}/status`);
+export async function getVmStatus(node: string, vmid: number): Promise<import("./types").VmStatusResponse> {
+  return api<import("./types").VmStatusResponse>(`/vm/${node}/vms/${vmid}/status`);
 }
 
 export async function controlVm(node: string, vmid: number, action: string) {
@@ -358,8 +358,8 @@ interface VmPortsResponse {
   ports: PortInfo[];
 }
 
-export async function getVmPorts(vmid: number): Promise<PortInfo[]> {
-  const res = await api<VmPortsResponse>(`/network/${vmid}/ports`);
+export async function getVmPorts(node: string, vmid: number): Promise<PortInfo[]> {
+  const res = await api<VmPortsResponse>(`/network/${encodeURIComponent(node)}/${vmid}/ports`);
   return res.ports ?? [];
 }
 
@@ -402,7 +402,7 @@ export interface VmPort {
 }
 
 export async function getCustomPorts(node: string, vmid: number): Promise<VmPort[]> {
-  const res = await api<{ vmid: number; ports: VmPort[] }>(`/firewall/${node}/${vmid}/ports`);
+  const res = await api<{ vmid: number; ports: VmPort[] }>(`/firewall/${encodeURIComponent(node)}/${vmid}/ports`);
   return res.ports ?? [];
 }
 
@@ -411,11 +411,15 @@ export async function addCustomPort(
   vmid: number,
   body: { internal_port: number; protocol: string; source?: string; description?: string }
 ): Promise<VmPort> {
-  return api<VmPort>(`/firewall/${node}/${vmid}/ports`, { method: "POST", body });
+  return api<VmPort>(`/firewall/${encodeURIComponent(node)}/${vmid}/ports`, { method: "POST", body });
 }
 
 export async function deleteCustomPort(node: string, vmid: number, portId: number) {
-  return api(`/firewall/${node}/${vmid}/ports/${portId}`, { method: "DELETE" });
+  return api(`/firewall/${encodeURIComponent(node)}/${vmid}/ports/${portId}`, { method: "DELETE" });
+}
+
+export async function restoreDefaultPorts(node: string, vmid: number): Promise<{ restored: number }> {
+  return api<{ restored: number }>(`/firewall/${encodeURIComponent(node)}/${vmid}/ports/defaults/restore`, { method: "POST" });
 }
 
 // ── VM 연장 API ─────────────────────────────────────────────
