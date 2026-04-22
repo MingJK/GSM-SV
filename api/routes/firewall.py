@@ -1,6 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from schemas.fw_schema import FirewallRule, VmPortCreate
 from services.proxmox_client import get_proxmox_for_server
 from services.network_service import allocate_random_port, manage_custom_iptables, manage_iptables, calculate_ports
@@ -168,6 +169,9 @@ async def add_custom_port(
     try:
         db.commit()
         db.refresh(vm_port)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="포트 할당 충돌이 발생했습니다. 다시 시도해 주세요.")
     except Exception as e:
         db.rollback()
         logger.error(f"[firewall] DB 저장 실패: {e}")
@@ -212,6 +216,8 @@ async def delete_custom_port(
     vm_port = db.query(VmPort).filter(VmPort.id == port_id, VmPort.vm_id == vm.id).first()
     if not vm_port:
         raise HTTPException(status_code=404, detail="포트를 찾을 수 없습니다.")
+    if vm_port.is_default:
+        raise HTTPException(status_code=409, detail="기본 포트는 삭제할 수 없습니다.")
 
     # iptables 규칙 삭제 ("tcp/udp" 프로토콜은 두 번 호출)
     # 실패해도 DB 레코드는 삭제 — 삭제 실패 시 영구적으로 못 지우는 것이 더 위험

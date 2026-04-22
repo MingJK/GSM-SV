@@ -139,6 +139,8 @@ def manage_custom_iptables(
         return False
 
     flag = "-A" if action == "ADD" else "-D"
+    if source_ip in ("0.0.0.0/0", "0.0.0.0"):
+        source_ip = None
     src = f"-s {source_ip} " if source_ip else ""
     commands = [
         f"sudo iptables -t nat {flag} PREROUTING {src}-p {protocol} -d {settings.GATEWAY_PUBLIC_IP} --dport {external_port} -j DNAT --to-destination {vm_ip}:{internal_port}",

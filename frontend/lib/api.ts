@@ -410,7 +410,7 @@ export async function addCustomPort(
   vmid: number,
   body: { internal_port: number; protocol: string; source?: string; description?: string }
 ): Promise<VmPort> {
-  return api<VmPort>(`/firewall/${vmid}/ports`, { method: "POST", body: body as unknown as BodyInit });
+  return api<VmPort>(`/firewall/${vmid}/ports`, { method: "POST", body });
 }
 
 export async function deleteCustomPort(vmid: number, portId: number) {
