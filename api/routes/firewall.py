@@ -216,7 +216,7 @@ async def restore_default_ports(
         ))
         if vm.internal_ip:
             for proto in (["tcp", "udp"] if protocol == "tcp/udp" else [protocol]):
-                manage_custom_iptables(
+                success = manage_custom_iptables(
                     server=server,
                     vm_ip=vm.internal_ip,
                     internal_port=internal_port,
@@ -224,6 +224,9 @@ async def restore_default_ports(
                     protocol=proto,
                     action="ADD",
                 )
+                if not success:
+                    db.rollback()
+                    raise HTTPException(status_code=502, detail=f"Gateway 방화벽 규칙 설정 실패: {description} ({proto})")
     try:
         db.commit()
     except Exception as e:
