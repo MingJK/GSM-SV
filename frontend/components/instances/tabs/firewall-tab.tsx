@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 
 import type { Instance } from "@/lib/types"
 import { type PortInfo, type VmPort, getCustomPorts, addCustomPort, deleteCustomPort } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
 export function FirewallTab({
   instance,
@@ -25,6 +26,7 @@ export function FirewallTab({
   instance: Instance
   ports?: PortInfo[]
 }) {
+  const { toast } = useToast()
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const [customPorts, setCustomPorts] = useState<VmPort[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,7 +84,7 @@ export function FirewallTab({
       setDialogOpen(false)
       await fetchPorts()
     } catch {
-      // 에러는 조용히 처리 (추후 toast 연동 가능)
+      toast({ variant: "destructive", title: "포트 추가 실패", description: "포트를 추가하는 중 오류가 발생했습니다." })
     } finally {
       setSubmitting(false)
     }
@@ -94,7 +96,7 @@ export function FirewallTab({
       await deleteCustomPort(instance.vmid, portId)
       await fetchPorts()
     } catch {
-      // 조용히 실패
+      toast({ variant: "destructive", title: "포트 삭제 실패", description: "포트를 삭제하는 중 오류가 발생했습니다." })
     } finally {
       setDeletingId(null)
     }
