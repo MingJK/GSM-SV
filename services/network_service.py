@@ -1,8 +1,11 @@
 import re
+import random
 import logging
 import paramiko
+from typing import Optional
 from datetime import datetime
 from pathlib import Path
+from sqlalchemy.orm import Session
 from models.server import Server
 from core.config import settings
 
@@ -72,8 +75,8 @@ def manage_iptables(server: Server, vmid: int, vm_ip: str, action: str = "ADD"):
                 commands.append(f"sudo iptables -t nat -D PREROUTING -p {proto} -d {settings.GATEWAY_PUBLIC_IP} --dport {public_port} -j DNAT --to-destination {vm_ip}:{internal_port}")
                 commands.append(f"sudo iptables -D FORWARD -p {proto} -d {vm_ip} --dport {internal_port} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT")
 
+    ssh = paramiko.SSHClient()
     try:
-        ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.WarningPolicy())
         ssh.connect(
             hostname=server.gateway_ip,
@@ -81,23 +84,93 @@ def manage_iptables(server: Server, vmid: int, vm_ip: str, action: str = "ADD"):
             password=server.gateway_password or "",
             timeout=10
         )
-        
+
         for cmd in commands:
             logger.info(f"Executing on {server.gateway_ip}: {cmd}")
-            stdin, stdout, stderr = ssh.exec_command(cmd)
-            err = stderr.read().decode()
-            if err:
-                logger.error(f"iptables command error: {err}")
+            _, stdout_ch, stderr_ch = ssh.exec_command(cmd)
+            exit_status = stdout_ch.channel.recv_exit_status()
+            if exit_status != 0:
+                err = stderr_ch.read().decode()
+                logger.error(f"iptables command failed (exit {exit_status}): {err}")
 
         # iptables 백업 (변경 후 자동 저장)
         _backup_iptables(ssh, server.gateway_ip)
 
-        ssh.close()
         return True
     except Exception as e:
         logger.error(f"Gateway SSH 접속 및 iptables 설정 실패: {e}")
         # 생성/삭제 핵심 로직을 멈추지는 않되 로그를 기록함
         return False
+    finally:
+        ssh.close()
+
+
+def allocate_random_port(db: Session, start: int = 30000, end: int = 39999) -> int:
+    """30000~39999 범위에서 DB에 없는 미사용 외부 포트를 랜덤으로 반환합니다."""
+    from models.vm_port import VmPort
+    for _ in range(100):
+        port = random.randint(start, end)
+        exists = db.query(VmPort).filter(VmPort.external_port == port).first()
+        if not exists:
+            return port
+    raise RuntimeError("30000~39999 범위에서 할당 가능한 포트가 없습니다.")
+
+
+_VALID_PROTOCOLS = {"tcp", "udp"}
+
+
+def manage_custom_iptables(
+    server: Server,
+    vm_ip: str,
+    internal_port: int,
+    external_port: int,
+    protocol: str,
+    action: str = "ADD",
+    source_ip: Optional[str] = None,
+) -> bool:
+    """커스텀 포트 포워딩 iptables 규칙을 추가하거나 삭제합니다."""
+    if protocol not in _VALID_PROTOCOLS:
+        raise ValueError(f"유효하지 않은 프로토콜: {protocol}. tcp 또는 udp만 허용됩니다.")
+    _validate_ip(vm_ip)
+    _validate_ip(settings.GATEWAY_PUBLIC_IP)
+
+    if not server.gateway_ip or not server.gateway_user:
+        logger.warning(f"서버 {server.name}의 Gateway 정보가 설정되지 않아 iptables 설정을 건너뜁니다.")
+        return False
+
+    flag = "-A" if action == "ADD" else "-D"
+    if source_ip in ("0.0.0.0/0", "0.0.0.0"):
+        source_ip = None
+    src = f"-s {source_ip} " if source_ip else ""
+    commands = [
+        f"sudo iptables -t nat {flag} PREROUTING {src}-p {protocol} -d {settings.GATEWAY_PUBLIC_IP} --dport {external_port} -j DNAT --to-destination {vm_ip}:{internal_port}",
+        f"sudo iptables {flag} FORWARD {src}-p {protocol} -d {vm_ip} --dport {internal_port} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT",
+    ]
+
+    ssh = paramiko.SSHClient()
+    try:
+        ssh.set_missing_host_key_policy(paramiko.WarningPolicy())
+        ssh.connect(
+            hostname=server.gateway_ip,
+            username=server.gateway_user,
+            password=server.gateway_password or "",
+            timeout=10,
+        )
+        for cmd in commands:
+            logger.info(f"Executing on {server.gateway_ip}: {cmd}")
+            _, stdout_ch, stderr_ch = ssh.exec_command(cmd)
+            exit_status = stdout_ch.channel.recv_exit_status()
+            if exit_status != 0:
+                err = stderr_ch.read().decode()
+                logger.error(f"iptables command failed (exit {exit_status}): {err}")
+                return False
+        _backup_iptables(ssh, server.gateway_ip)
+        return True
+    except Exception as e:
+        logger.error(f"Gateway SSH 접속 및 커스텀 iptables 설정 실패: {e}")
+        return False
+    finally:
+        ssh.close()
 
 
 def _backup_iptables(ssh: paramiko.SSHClient, gateway_ip: str, **_kwargs):

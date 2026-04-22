@@ -389,6 +389,34 @@ export async function deleteFirewallRule(vmid: number, pos: number) {
   return api(`/firewall/${vmid}/rules/${pos}`, { method: "DELETE" });
 }
 
+// ── 커스텀 포트 API (30000~39999) ────────────────────────────
+
+export interface VmPort {
+  id: number
+  internal_port: number
+  external_port: number
+  protocol: string
+  source?: string
+  description?: string
+  is_default?: boolean
+}
+
+export async function getCustomPorts(vmid: number): Promise<VmPort[]> {
+  const res = await api<{ vmid: number; ports: VmPort[] }>(`/firewall/${vmid}/ports`);
+  return res.ports ?? [];
+}
+
+export async function addCustomPort(
+  vmid: number,
+  body: { internal_port: number; protocol: string; source?: string; description?: string }
+): Promise<VmPort> {
+  return api<VmPort>(`/firewall/${vmid}/ports`, { method: "POST", body });
+}
+
+export async function deleteCustomPort(vmid: number, portId: number) {
+  return api(`/firewall/${vmid}/ports/${portId}`, { method: "DELETE" });
+}
+
 // ── VM 연장 API ─────────────────────────────────────────────
 
 export async function extendVm(node: string, vmid: number) {

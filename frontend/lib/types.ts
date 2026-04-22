@@ -21,6 +21,7 @@ export interface Instance {
   vm_password?: string
   public_ip?: string
   cpu_usage?: number
+  mem_usage?: number
   maxmem?: number
   maxdisk?: number
   uptime_seconds?: number

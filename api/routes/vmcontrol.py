@@ -1,7 +1,7 @@
+import asyncio
 import base64
 import logging
 import re
-import time
 from datetime import timedelta
 from core.timezone import now_kst
 from fastapi import APIRouter, HTTPException, status, Depends, Request
@@ -225,7 +225,7 @@ async def get_vm_status(
                     command="test -f /home/ubuntu/ok.txt && echo OK || echo NOTYET"
                 )
                 pid = result.get("pid")
-                time.sleep(1)
+                await asyncio.sleep(1)
                 out = proxmox.nodes(node).qemu(vmid).agent("exec-status").get(pid=pid)
                 stdout = base64.b64decode(out.get("out-data", "")).decode(errors="ignore")
                 provisioning = "OK" not in stdout and 0 < uptime < 180
@@ -242,6 +242,7 @@ async def get_vm_status(
             "maxdisk": vm_status.get("maxdisk", 0),
             "uptime": vm_status.get("uptime", 0),
             "cpu": vm_status.get("cpu", 0),
+            "mem": vm_status.get("mem", 0),
             # DB 데이터
             "internal_ip": vm_record.internal_ip,
             "vm_password": vm_record.vm_password,

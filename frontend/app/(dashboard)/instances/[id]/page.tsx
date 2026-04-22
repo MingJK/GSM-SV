@@ -62,6 +62,7 @@ export default function InstanceDetailPage({
           vm_password: statusData.vm_password,
           public_ip: statusData.public_ip,
           cpu_usage: statusData.cpu,
+          mem_usage: statusData.mem,
           maxmem: statusData.maxmem,
           maxdisk: statusData.maxdisk,
           uptime_seconds: statusData.uptime,

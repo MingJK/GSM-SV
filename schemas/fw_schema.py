@@ -1,5 +1,32 @@
-from pydantic import BaseModel
+import ipaddress
+from pydantic import BaseModel, field_validator, Field
 from typing import Optional
+
+
+class VmPortCreate(BaseModel):
+    internal_port: int = Field(..., ge=1, le=65535)
+    protocol: str = "tcp"
+    source: Optional[str] = None
+    description: Optional[str] = None
+
+    @field_validator("protocol")
+    @classmethod
+    def validate_protocol(cls, v: str) -> str:
+        if v not in ("tcp", "udp"):
+            raise ValueError("프로토콜은 tcp 또는 udp만 허용됩니다.")
+        return v
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        try:
+            ipaddress.ip_network(v, strict=False)
+        except ValueError:
+            raise ValueError("올바른 IP 또는 CIDR 형식이어야 합니다. (예: 192.168.1.0/24)")
+        return v
+
 
 class FirewallRule(BaseModel):
     """방화벽 규칙 생성/수정 모델"""
