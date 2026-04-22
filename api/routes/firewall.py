@@ -79,14 +79,15 @@ async def delete_firewall_rule(
 
 # ── 커스텀 포트 할당 (30000~39999) ───────────────────────────────────────────
 
-@router.get("/{vmid}/ports")
+@router.get("/{node}/{vmid}/ports")
 async def get_custom_ports(
+    node: str,
     vmid: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """커스텀 포트 목록 조회 (DB) — 기본 포트 레코드가 없으면 자동 생성"""
-    vm = get_vm_with_owner_check(db, vmid, current_user)
+    vm = get_vm_with_owner_check(db, vmid, current_user, node=node)
 
     has_defaults = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(True)).first()
     if not has_defaults:
@@ -135,15 +136,16 @@ async def get_custom_ports(
     }
 
 
-@router.post("/{vmid}/ports", status_code=201)
+@router.post("/{node}/{vmid}/ports", status_code=201)
 async def add_custom_port(
+    node: str,
     vmid: int,
     body: VmPortCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """커스텀 포트 추가 — 30000~39999 랜덤 외부 포트 할당 + iptables + Proxmox 방화벽 규칙"""
-    vm = get_vm_with_owner_check(db, vmid, current_user)
+    vm = get_vm_with_owner_check(db, vmid, current_user, node=node)
     server = vm.server
 
     custom_count = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(False)).count()
@@ -202,15 +204,16 @@ async def add_custom_port(
     }
 
 
-@router.delete("/{vmid}/ports/{port_id}")
+@router.delete("/{node}/{vmid}/ports/{port_id}")
 async def delete_custom_port(
+    node: str,
     vmid: int,
     port_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """커스텀 포트 삭제 — iptables 제거 + DB 삭제"""
-    vm = get_vm_with_owner_check(db, vmid, current_user)
+    vm = get_vm_with_owner_check(db, vmid, current_user, node=node)
     server = vm.server
 
     vm_port = db.query(VmPort).filter(VmPort.id == port_id, VmPort.vm_id == vm.id).first()

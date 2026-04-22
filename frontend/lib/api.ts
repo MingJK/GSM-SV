@@ -401,20 +401,21 @@ export interface VmPort {
   is_default?: boolean
 }
 
-export async function getCustomPorts(vmid: number): Promise<VmPort[]> {
-  const res = await api<{ vmid: number; ports: VmPort[] }>(`/firewall/${vmid}/ports`);
+export async function getCustomPorts(node: string, vmid: number): Promise<VmPort[]> {
+  const res = await api<{ vmid: number; ports: VmPort[] }>(`/firewall/${node}/${vmid}/ports`);
   return res.ports ?? [];
 }
 
 export async function addCustomPort(
+  node: string,
   vmid: number,
   body: { internal_port: number; protocol: string; source?: string; description?: string }
 ): Promise<VmPort> {
-  return api<VmPort>(`/firewall/${vmid}/ports`, { method: "POST", body });
+  return api<VmPort>(`/firewall/${node}/${vmid}/ports`, { method: "POST", body });
 }
 
-export async function deleteCustomPort(vmid: number, portId: number) {
-  return api(`/firewall/${vmid}/ports/${portId}`, { method: "DELETE" });
+export async function deleteCustomPort(node: string, vmid: number, portId: number) {
+  return api(`/firewall/${node}/${vmid}/ports/${portId}`, { method: "DELETE" });
 }
 
 // ── VM 연장 API ─────────────────────────────────────────────

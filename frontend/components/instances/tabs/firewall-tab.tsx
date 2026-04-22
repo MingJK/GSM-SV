@@ -44,14 +44,14 @@ export function FirewallTab({
 
   const fetchPorts = useCallback(async () => {
     try {
-      const data = await getCustomPorts(instance.vmid)
+      const data = await getCustomPorts(instance.node, instance.vmid)
       setCustomPorts(data)
     } catch (e) {
       console.error("fetchPorts 실패:", e)
     } finally {
       setLoading(false)
     }
-  }, [instance.vmid])
+  }, [instance.node, instance.vmid])
 
   useEffect(() => {
     fetchPorts()
@@ -73,7 +73,7 @@ export function FirewallTab({
     setSubmitting(true)
     setAddError(null)
     try {
-      await addCustomPort(instance.vmid, {
+      await addCustomPort(instance.node, instance.vmid, {
         internal_port: port,
         protocol: form.protocol,
         source: form.source || undefined,
@@ -93,7 +93,7 @@ export function FirewallTab({
     setDeletingId(portId)
     setDeleteError(null)
     try {
-      await deleteCustomPort(instance.vmid, portId)
+      await deleteCustomPort(instance.node, instance.vmid, portId)
       await fetchPorts()
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "포트 삭제에 실패했습니다.")
