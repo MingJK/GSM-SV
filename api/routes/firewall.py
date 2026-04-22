@@ -225,8 +225,7 @@ async def restore_default_ports(
                     action="ADD",
                 )
                 if not success:
-                    db.rollback()
-                    raise HTTPException(status_code=502, detail=f"Gateway 방화벽 규칙 설정 실패: {description} ({proto})")
+                    logger.error(f"[firewall] 기본 포트 복원 iptables 실패 — {description} ({proto}), DB 저장은 계속 진행")
     try:
         db.commit()
     except Exception as e:

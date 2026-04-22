@@ -35,6 +35,7 @@ export function FirewallTab({
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [restoring, setRestoring] = useState(false)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     internal_port: "",
@@ -92,11 +93,12 @@ export function FirewallTab({
 
   const handleRestoreDefaults = async () => {
     setRestoring(true)
+    setRestoreError(null)
     try {
       await restoreDefaultPorts(instance.node, instance.vmid)
       await fetchPorts()
     } catch (e) {
-      console.error("기본 포트 복원 실패:", e)
+      setRestoreError(e instanceof Error ? e.message : "기본 포트 복원에 실패했습니다.")
     } finally {
       setRestoring(false)
     }
@@ -279,6 +281,9 @@ export function FirewallTab({
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
+          {restoreError && (
+            <p className="text-sm text-destructive px-1">{restoreError}</p>
+          )}
           {deleteError && (
             <p className="text-sm text-destructive px-1">{deleteError}</p>
           )}
