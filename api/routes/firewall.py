@@ -271,6 +271,8 @@ async def delete_custom_port(
             if not success:
                 logger.error(f"[firewall] Gateway iptables 삭제 실패 — port {vm_port.external_port} ({proto}), DB 레코드는 삭제 진행")
 
+    external_port = vm_port.external_port
+    internal_port = vm_port.internal_port
     db.delete(vm_port)
     db.commit()
-    return {"success": True, "message": f"포트 {vm_port.external_port}→{vm_port.internal_port} 삭제 완료"}
+    return {"success": True, "message": f"포트 {external_port}→{internal_port} 삭제 완료"}
