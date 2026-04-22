@@ -297,17 +297,19 @@ export function FirewallTab({
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-muted-foreground font-mono">:{p.external_port}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    disabled={deletingId === p.id}
-                    onClick={() => handleDeleteCustom(p.id)}
-                  >
-                    {deletingId === p.id
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Trash2 className="h-3.5 w-3.5" />}
-                  </Button>
+                  {!p.is_default && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      disabled={deletingId === p.id}
+                      onClick={() => handleDeleteCustom(p.id)}
+                    >
+                      {deletingId === p.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Trash2 className="h-3.5 w-3.5" />}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))
