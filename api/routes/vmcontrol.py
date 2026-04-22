@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import time
@@ -224,7 +225,7 @@ async def get_vm_status(
                     command="test -f /home/ubuntu/ok.txt && echo OK || echo NOTYET"
                 )
                 pid = result.get("pid")
-                time.sleep(1)
+                await asyncio.sleep(1)
                 out = proxmox.nodes(node).qemu(vmid).agent("exec-status").get(pid=pid)
                 stdout = out.get("out-data", "")
                 provisioning = "OK" not in stdout
