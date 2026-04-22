@@ -2,7 +2,6 @@ import asyncio
 import base64
 import logging
 import re
-import time
 from datetime import timedelta
 from core.timezone import now_kst
 from fastapi import APIRouter, HTTPException, status, Depends, Request
