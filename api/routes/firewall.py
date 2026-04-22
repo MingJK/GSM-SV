@@ -216,8 +216,6 @@ async def delete_custom_port(
     vm_port = db.query(VmPort).filter(VmPort.id == port_id, VmPort.vm_id == vm.id).first()
     if not vm_port:
         raise HTTPException(status_code=404, detail="포트를 찾을 수 없습니다.")
-    if vm_port.is_default:
-        raise HTTPException(status_code=409, detail="기본 포트는 삭제할 수 없습니다.")
 
     # iptables 규칙 삭제 ("tcp/udp" 프로토콜은 두 번 호출)
     # 실패해도 DB 레코드는 삭제 — 삭제 실패 시 영구적으로 못 지우는 것이 더 위험
