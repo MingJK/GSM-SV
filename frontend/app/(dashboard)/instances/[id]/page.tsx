@@ -43,7 +43,7 @@ export default function InstanceDetailPage({
 
     Promise.all([
       getVmStatus(node, vmid),
-      getVmPorts(vmid).catch(() => []),
+      getVmPorts(node, vmid).catch(() => []),
     ])
       .then(([statusData, portsData]: [any, PortInfo[]]) => {
         setInstance({

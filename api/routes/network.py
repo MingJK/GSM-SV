@@ -8,14 +8,15 @@ from services.network_service import calculate_ports
 router = APIRouter()
 
 
-@router.get("/{vmid}/ports")
+@router.get("/{node}/{vmid}/ports")
 async def get_forwarded_ports(
+    node: str,
     vmid: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """특정 VM에 할당된 포트포워딩 정보 조회 (SSH, SVC1, SVC2)"""
-    vm = get_vm_with_owner_check(db, vmid, current_user)
+    vm = get_vm_with_owner_check(db, vmid, current_user, node=node)
     ports = calculate_ports(vm.server.base_port, vmid)
 
     return {

@@ -358,8 +358,8 @@ interface VmPortsResponse {
   ports: PortInfo[];
 }
 
-export async function getVmPorts(vmid: number): Promise<PortInfo[]> {
-  const res = await api<VmPortsResponse>(`/network/${vmid}/ports`);
+export async function getVmPorts(node: string, vmid: number): Promise<PortInfo[]> {
+  const res = await api<VmPortsResponse>(`/network/${node}/${vmid}/ports`);
   return res.ports ?? [];
 }
 
