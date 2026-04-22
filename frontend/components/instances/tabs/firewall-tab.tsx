@@ -188,7 +188,7 @@ export function FirewallTab({
               방화벽 규칙
             </CardTitle>
             <CardDescription className="mt-1">
-              기본 포트는 0.0.0.0/0으로 허용됩니다. 추가 포트는 30000~39999에서 외부 포트가 랜덤 할당됩니다.
+              기본 포트는 0.0.0.0/0으로 허용됩니다. 추가 포트는 30000~39999에서 외부 포트가 랜덤 할당되며, 최대 30개까지 추가할 수 있습니다.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 shrink-0">
