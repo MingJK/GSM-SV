@@ -4,6 +4,23 @@
 
 export type InstanceStatus = "running" | "stopped" | "pending" | "error"
 
+export interface VmStatusResponse {
+  name?: string
+  status?: InstanceStatus
+  cpus?: number
+  maxmem?: number
+  maxdisk?: number
+  uptime?: number
+  cpu?: number
+  mem?: number
+  internal_ip?: string
+  vm_password?: string
+  public_ip?: string
+  created_at?: string
+  expires_at?: string
+  provisioning?: boolean
+}
+
 export interface Instance {
   vmid: number
   name: string

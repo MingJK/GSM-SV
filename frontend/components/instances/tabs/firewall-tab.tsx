@@ -10,13 +10,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Globe, Copy, Check, Shield, Plus, Trash2, Loader2, ChevronDown } from "lucide-react"
+import { Globe, Copy, Check, Shield, Plus, Trash2, Loader2, ChevronDown, RotateCcw } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 import type { Instance } from "@/lib/types"
-import { type PortInfo, type VmPort, getCustomPorts, addCustomPort, deleteCustomPort } from "@/lib/api"
+import { type PortInfo, type VmPort, getCustomPorts, addCustomPort, deleteCustomPort, restoreDefaultPorts } from "@/lib/api"
 
 export function FirewallTab({
   instance,
@@ -34,6 +34,8 @@ export function FirewallTab({
   const [addError, setAddError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     internal_port: "",
@@ -44,14 +46,14 @@ export function FirewallTab({
 
   const fetchPorts = useCallback(async () => {
     try {
-      const data = await getCustomPorts(instance.vmid)
+      const data = await getCustomPorts(instance.node, instance.vmid)
       setCustomPorts(data)
     } catch (e) {
       console.error("fetchPorts 실패:", e)
     } finally {
       setLoading(false)
     }
-  }, [instance.vmid])
+  }, [instance.node, instance.vmid])
 
   useEffect(() => {
     fetchPorts()
@@ -73,7 +75,7 @@ export function FirewallTab({
     setSubmitting(true)
     setAddError(null)
     try {
-      await addCustomPort(instance.vmid, {
+      await addCustomPort(instance.node, instance.vmid, {
         internal_port: port,
         protocol: form.protocol,
         source: form.source || undefined,
@@ -89,11 +91,24 @@ export function FirewallTab({
     }
   }
 
+  const handleRestoreDefaults = async () => {
+    setRestoring(true)
+    setRestoreError(null)
+    try {
+      await restoreDefaultPorts(instance.node, instance.vmid)
+      await fetchPorts()
+    } catch (e) {
+      setRestoreError(e instanceof Error ? e.message : "기본 포트 복원에 실패했습니다.")
+    } finally {
+      setRestoring(false)
+    }
+  }
+
   const handleDeleteCustom = async (portId: number) => {
     setDeletingId(portId)
     setDeleteError(null)
     try {
-      await deleteCustomPort(instance.vmid, portId)
+      await deleteCustomPort(instance.node, instance.vmid, portId)
       await fetchPorts()
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : "포트 삭제에 실패했습니다.")
@@ -175,9 +190,24 @@ export function FirewallTab({
               방화벽 규칙
             </CardTitle>
             <CardDescription className="mt-1">
-              기본 포트는 0.0.0.0/0으로 허용됩니다. 추가 포트는 30000~39999에서 외부 포트가 랜덤 할당됩니다.
+              기본 포트는 0.0.0.0/0으로 허용됩니다. 추가 포트는 30000~39999에서 외부 포트가 랜덤 할당되며, 최대 30개까지 추가할 수 있습니다.
             </CardDescription>
           </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {!loading && customPorts.filter(p => p.is_default).length < 3 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-muted-foreground"
+                disabled={restoring}
+                onClick={handleRestoreDefaults}
+              >
+                {restoring
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <RotateCcw className="h-3.5 w-3.5" />}
+                기본 포트 복원
+              </Button>
+            )}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="gap-1.5 shrink-0">
@@ -248,8 +278,12 @@ export function FirewallTab({
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
+          {restoreError && (
+            <p className="text-sm text-destructive px-1">{restoreError}</p>
+          )}
           {deleteError && (
             <p className="text-sm text-destructive px-1">{deleteError}</p>
           )}
