@@ -1,3 +1,4 @@
+import base64
 import logging
 import re
 import time
@@ -226,10 +227,10 @@ async def get_vm_status(
                 pid = result.get("pid")
                 time.sleep(1)
                 out = proxmox.nodes(node).qemu(vmid).agent("exec-status").get(pid=pid)
-                stdout = out.get("out-data", "")
-                provisioning = "OK" not in stdout and uptime < 180
+                stdout = base64.b64decode(out.get("out-data", "")).decode(errors="ignore")
+                provisioning = "OK" not in stdout and 0 < uptime < 180
             except Exception:
-                provisioning = uptime < 180
+                provisioning = 0 < uptime < 180
 
         # Proxmox 실시간 데이터 + DB 저장 데이터 통합
         return {
