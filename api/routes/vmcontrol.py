@@ -218,6 +218,7 @@ async def get_vm_status(
         # cloud-init 완료 여부 확인 (running 상태일 때만)
         provisioning = False
         if vm_status.get("status") == "running":
+            uptime = vm_status.get("uptime", 0)
             try:
                 result = proxmox.nodes(node).qemu(vmid).agent.exec.post(
                     command="test -f /home/ubuntu/ok.txt && echo OK || echo NOTYET"
@@ -228,7 +229,7 @@ async def get_vm_status(
                 stdout = out.get("out-data", "")
                 provisioning = "OK" not in stdout and uptime < 180
             except Exception:
-                provisioning = True
+                provisioning = uptime < 180
 
         # Proxmox 실시간 데이터 + DB 저장 데이터 통합
         return {
