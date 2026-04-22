@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { InstanceHeader } from "@/components/instances/instance-header"
 import { InstanceTabs } from "@/components/instances/instance-tabs"
 import { getVmStatus, getVmPorts, type PortInfo } from "@/lib/api"
-import type { Instance } from "@/lib/types"
+import type { Instance, VmStatusResponse } from "@/lib/types"
 import { Loader2 } from "lucide-react"
 
 function formatUptime(seconds?: number): string {
@@ -45,7 +45,7 @@ export default function InstanceDetailPage({
       getVmStatus(node, vmid),
       getVmPorts(node, vmid).catch(() => []),
     ])
-      .then(([statusData, portsData]: [any, PortInfo[]]) => {
+      .then(([statusData, portsData]: [VmStatusResponse, PortInfo[]]) => {
         setInstance({
           vmid,
           name: statusData.name || `VM-${vmid}`,

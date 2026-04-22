@@ -320,8 +320,8 @@ export async function getAllVms(): Promise<AdminNodeVms[]> {
   return res.nodes;
 }
 
-export async function getVmStatus(node: string, vmid: number) {
-  return api(`/vm/${node}/vms/${vmid}/status`);
+export async function getVmStatus(node: string, vmid: number): Promise<import("./types").VmStatusResponse> {
+  return api<import("./types").VmStatusResponse>(`/vm/${node}/vms/${vmid}/status`);
 }
 
 export async function controlVm(node: string, vmid: number, action: string) {
