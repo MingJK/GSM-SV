@@ -86,50 +86,8 @@ async def get_custom_ports(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """커스텀 포트 목록 조회 (DB) — 기본 포트 레코드가 없으면 자동 생성"""
+    """커스텀 포트 목록 조회 (DB)"""
     vm = get_vm_with_owner_check(db, vmid, current_user, node=node)
-
-    _DEFAULT_PORTS = [
-        (22,    "tcp",     "SSH",  "ssh"),
-        (80,    "tcp",     "HTTP", "svc1"),
-        (10000, "tcp/udp", "SVC",  "svc2"),
-    ]
-    existing_default_ports = {
-        p.internal_port
-        for p in db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(True)).all()
-    }
-    missing_defaults = [(ip, proto, desc, key) for ip, proto, desc, key in _DEFAULT_PORTS if ip not in existing_default_ports]
-
-    if missing_defaults:
-        server = vm.server
-        default_port_map = calculate_ports(server.base_port, vmid)
-        for internal_port, protocol, description, port_key in missing_defaults:
-            external_port = default_port_map[port_key]
-            db.add(VmPort(
-                vm_id=vm.id,
-                internal_port=internal_port,
-                external_port=external_port,
-                protocol=protocol,
-                action="ACCEPT",
-                source="0.0.0.0/0",
-                description=description,
-                is_default=True,
-            ))
-            if vm.internal_ip:
-                for proto in (["tcp", "udp"] if protocol == "tcp/udp" else [protocol]):
-                    manage_custom_iptables(
-                        server=server,
-                        vm_ip=vm.internal_ip,
-                        internal_port=internal_port,
-                        external_port=external_port,
-                        protocol=proto,
-                        action="ADD",
-                    )
-        try:
-            db.commit()
-        except Exception as e:
-            logger.error(f"[firewall] 기본 포트 백필 실패: {e}")
-            db.rollback()
 
     ports = db.query(VmPort).filter(VmPort.vm_id == vm.id).all()
     return {
@@ -216,6 +174,64 @@ async def add_custom_port(
         "protocol": vm_port.protocol,
         "description": vm_port.description,
     }
+
+
+@router.post("/{node}/{vmid}/ports/defaults/restore")
+async def restore_default_ports(
+    node: str,
+    vmid: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """삭제된 기본 포트(SSH/HTTP/SVC) 복원"""
+    vm = get_vm_with_owner_check(db, vmid, current_user, node=node)
+    server = vm.server
+
+    _DEFAULT_PORTS = [
+        (22,    "tcp",     "SSH",  "ssh"),
+        (80,    "tcp",     "HTTP", "svc1"),
+        (10000, "tcp/udp", "SVC",  "svc2"),
+    ]
+    existing = {
+        p.internal_port
+        for p in db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(True)).all()
+    }
+    missing = [(ip, proto, desc, key) for ip, proto, desc, key in _DEFAULT_PORTS if ip not in existing]
+
+    if not missing:
+        return {"restored": 0}
+
+    default_port_map = calculate_ports(server.base_port, vmid)
+    for internal_port, protocol, description, port_key in missing:
+        external_port = default_port_map[port_key]
+        db.add(VmPort(
+            vm_id=vm.id,
+            internal_port=internal_port,
+            external_port=external_port,
+            protocol=protocol,
+            action="ACCEPT",
+            source="0.0.0.0/0",
+            description=description,
+            is_default=True,
+        ))
+        if vm.internal_ip:
+            for proto in (["tcp", "udp"] if protocol == "tcp/udp" else [protocol]):
+                manage_custom_iptables(
+                    server=server,
+                    vm_ip=vm.internal_ip,
+                    internal_port=internal_port,
+                    external_port=external_port,
+                    protocol=proto,
+                    action="ADD",
+                )
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[firewall] 기본 포트 복원 실패: {e}")
+        raise HTTPException(status_code=500, detail="기본 포트 복원에 실패했습니다.")
+
+    return {"restored": len(missing)}
 
 
 @router.delete("/{node}/{vmid}/ports/{port_id}")

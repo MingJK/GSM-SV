@@ -418,6 +418,10 @@ export async function deleteCustomPort(node: string, vmid: number, portId: numbe
   return api(`/firewall/${encodeURIComponent(node)}/${vmid}/ports/${portId}`, { method: "DELETE" });
 }
 
+export async function restoreDefaultPorts(node: string, vmid: number): Promise<{ restored: number }> {
+  return api<{ restored: number }>(`/firewall/${encodeURIComponent(node)}/${vmid}/ports/defaults/restore`, { method: "POST" });
+}
+
 // ── VM 연장 API ─────────────────────────────────────────────
 
 export async function extendVm(node: string, vmid: number) {
