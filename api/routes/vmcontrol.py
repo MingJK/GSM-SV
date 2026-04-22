@@ -226,7 +226,7 @@ async def get_vm_status(
                 time.sleep(1)
                 out = proxmox.nodes(node).qemu(vmid).agent("exec-status").get(pid=pid)
                 stdout = out.get("out-data", "")
-                provisioning = "OK" not in stdout
+                provisioning = "OK" not in stdout and uptime < 180
             except Exception:
                 provisioning = True
 
