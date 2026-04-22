@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from schemas.fw_schema import FirewallRule, VmPortCreate
 from services.proxmox_client import get_proxmox_for_server
-from services.network_service import allocate_random_port, manage_custom_iptables, manage_iptables, calculate_ports
+from services.network_service import allocate_random_port, manage_custom_iptables, calculate_ports
 from core.database import get_db
 from models.user import User
 from models.vm_port import VmPort
