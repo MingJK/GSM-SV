@@ -1,37 +1,13 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, field_validator, Field
-from typing import Optional
 from sqlalchemy.orm import Session
-from schemas.fw_schema import FirewallRule
+from schemas.fw_schema import FirewallRule, VmPortCreate
 from services.proxmox_client import get_proxmox_for_server
-from services.network_service import allocate_random_port, manage_custom_iptables, calculate_ports
+from services.network_service import allocate_random_port, manage_custom_iptables, manage_iptables, calculate_ports
 from core.database import get_db
 from models.user import User
 from models.vm_port import VmPort
 from api.dependencies import get_current_user, get_vm_with_owner_check
-
-
-class VmPortCreate(BaseModel):
-    internal_port: int = Field(..., ge=1, le=65535)
-    protocol: str = "tcp"
-    action: str = "ACCEPT"
-    source: Optional[str] = None
-    description: Optional[str] = None
-
-    @field_validator("protocol")
-    @classmethod
-    def validate_protocol(cls, v: str) -> str:
-        if v not in ("tcp", "udp"):
-            raise ValueError("프로토콜은 tcp 또는 udp만 허용됩니다.")
-        return v
-
-    @field_validator("action")
-    @classmethod
-    def validate_action(cls, v: str) -> str:
-        if v not in ("ACCEPT", "DROP"):
-            raise ValueError("액션은 ACCEPT 또는 DROP만 허용됩니다.")
-        return v
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -114,6 +90,9 @@ async def get_custom_ports(
     has_defaults = db.query(VmPort).filter(VmPort.vm_id == vm.id, VmPort.is_default.is_(True)).first()
     if not has_defaults:
         server = vm.server
+        # 기본 포트가 모두 삭제된 경우 iptables 규칙도 함께 복원
+        if vm.internal_ip:
+            manage_iptables(server, vmid, vm.internal_ip, action="ADD")
         default_port_map = calculate_ports(server.base_port, vmid)
         for internal_port, protocol, description, external_port in [
             (22,    "tcp",     "SSH",  default_port_map["ssh"]),
@@ -155,7 +134,7 @@ async def get_custom_ports(
     }
 
 
-@router.post("/{vmid}/ports")
+@router.post("/{vmid}/ports", status_code=201)
 async def add_custom_port(
     vmid: int,
     body: VmPortCreate,
@@ -181,7 +160,7 @@ async def add_custom_port(
         internal_port=body.internal_port,
         external_port=external_port,
         protocol=body.protocol,
-        action=body.action,
+        action="ACCEPT",
         source=body.source,
         description=body.description,
     )
@@ -203,6 +182,7 @@ async def add_custom_port(
             external_port=external_port,
             protocol=body.protocol,
             action="ADD",
+            source_ip=body.source,
         )
         if not success:
             db.delete(vm_port)
@@ -236,6 +216,8 @@ async def delete_custom_port(
     # iptables 규칙 삭제 ("tcp/udp" 프로토콜은 두 번 호출)
     # 실패해도 DB 레코드는 삭제 — 삭제 실패 시 영구적으로 못 지우는 것이 더 위험
     if vm.internal_ip:
+        # ADD 시 source_ip와 동일한 값으로 DELETE — "0.0.0.0/0"은 플래그 없이 추가된 것이므로 None 처리
+        source_ip = vm_port.source if vm_port.source and vm_port.source != "0.0.0.0/0" else None
         protocols = ["tcp", "udp"] if vm_port.protocol == "tcp/udp" else [vm_port.protocol]
         for proto in protocols:
             success = manage_custom_iptables(
@@ -245,6 +227,7 @@ async def delete_custom_port(
                 external_port=vm_port.external_port,
                 protocol=proto,
                 action="DELETE",
+                source_ip=source_ip,
             )
             if not success:
                 logger.error(f"[firewall] Gateway iptables 삭제 실패 — port {vm_port.external_port} ({proto}), DB 레코드는 삭제 진행")

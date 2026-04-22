@@ -2,6 +2,7 @@ import re
 import random
 import logging
 import paramiko
+from typing import Optional
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.orm import Session
@@ -125,6 +126,7 @@ def manage_custom_iptables(
     external_port: int,
     protocol: str,
     action: str = "ADD",
+    source_ip: Optional[str] = None,
 ) -> bool:
     """커스텀 포트 포워딩 iptables 규칙을 추가하거나 삭제합니다."""
     if protocol not in _VALID_PROTOCOLS:
@@ -137,9 +139,10 @@ def manage_custom_iptables(
         return False
 
     flag = "-A" if action == "ADD" else "-D"
+    src = f"-s {source_ip} " if source_ip else ""
     commands = [
-        f"sudo iptables -t nat {flag} PREROUTING -p {protocol} -d {settings.GATEWAY_PUBLIC_IP} --dport {external_port} -j DNAT --to-destination {vm_ip}:{internal_port}",
-        f"sudo iptables {flag} FORWARD -p {protocol} -d {vm_ip} --dport {internal_port} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT",
+        f"sudo iptables -t nat {flag} PREROUTING {src}-p {protocol} -d {settings.GATEWAY_PUBLIC_IP} --dport {external_port} -j DNAT --to-destination {vm_ip}:{internal_port}",
+        f"sudo iptables {flag} FORWARD {src}-p {protocol} -d {vm_ip} --dport {internal_port} -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT",
     ]
 
     ssh = paramiko.SSHClient()

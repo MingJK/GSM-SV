@@ -31,12 +31,13 @@ export function FirewallTab({
   const [portsOpen, setPortsOpen] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     internal_port: "",
     protocol: "tcp",
-    action: "ACCEPT",
     source: "",
     description: "",
   })
@@ -70,19 +71,19 @@ export function FirewallTab({
     const port = parseInt(form.internal_port)
     if (!port || port < 1 || port > 65535) return
     setSubmitting(true)
+    setAddError(null)
     try {
       await addCustomPort(instance.vmid, {
         internal_port: port,
         protocol: form.protocol,
-        action: form.action,
         source: form.source || undefined,
         description: form.description || undefined,
       })
-      setForm({ internal_port: "", protocol: "tcp", action: "ACCEPT", source: "", description: "" })
+      setForm({ internal_port: "", protocol: "tcp", source: "", description: "" })
       setDialogOpen(false)
       await fetchPorts()
-    } catch {
-      // 에러는 조용히 처리 (추후 toast 연동 가능)
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : "포트 추가에 실패했습니다.")
     } finally {
       setSubmitting(false)
     }
@@ -90,11 +91,12 @@ export function FirewallTab({
 
   const handleDeleteCustom = async (portId: number) => {
     setDeletingId(portId)
+    setDeleteError(null)
     try {
       await deleteCustomPort(instance.vmid, portId)
       await fetchPorts()
-    } catch {
-      // 조용히 실패
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "포트 삭제에 실패했습니다.")
     } finally {
       setDeletingId(null)
     }
@@ -188,18 +190,18 @@ export function FirewallTab({
                 <DialogTitle>포트 추가</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 pt-2">
-                <div className="space-y-1.5">
-                  <Label>내부 포트 <span className="text-destructive">*</span></Label>
-                  <Input
-                    type="number"
-                    placeholder="예: 443, 8080"
-                    min={1}
-                    max={65535}
-                    value={form.internal_port}
-                    onChange={(e) => setForm((f) => ({ ...f, internal_port: e.target.value }))}
-                  />
-                </div>
                 <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>내부 포트 <span className="text-destructive">*</span></Label>
+                    <Input
+                      type="number"
+                      placeholder="예: 443, 8080"
+                      min={1}
+                      max={65535}
+                      value={form.internal_port}
+                      onChange={(e) => setForm((f) => ({ ...f, internal_port: e.target.value }))}
+                    />
+                  </div>
                   <div className="space-y-1.5">
                     <Label>프로토콜</Label>
                     <Select
@@ -212,21 +214,6 @@ export function FirewallTab({
                       <SelectContent>
                         <SelectItem value="tcp">TCP</SelectItem>
                         <SelectItem value="udp">UDP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>액션</Label>
-                    <Select
-                      value={form.action}
-                      onValueChange={(v) => setForm((f) => ({ ...f, action: v }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ACCEPT">ACCEPT</SelectItem>
-                        <SelectItem value="DROP">DROP</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -247,6 +234,9 @@ export function FirewallTab({
                     onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   />
                 </div>
+                {addError && (
+                  <p className="text-sm text-destructive">{addError}</p>
+                )}
                 <Button
                   className="w-full"
                   onClick={handleAdd}
@@ -260,6 +250,9 @@ export function FirewallTab({
           </Dialog>
         </CardHeader>
         <CardContent className="space-y-2">
+          {deleteError && (
+            <p className="text-sm text-destructive px-1">{deleteError}</p>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -279,13 +272,6 @@ export function FirewallTab({
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className={`inline-flex items-center rounded-md text-xs font-medium px-2 py-0.5 ring-1 ring-inset ${
-                    p.action === "DROP"
-                      ? "bg-red-500/10 text-red-600 dark:text-red-400 ring-red-500/20"
-                      : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20"
-                  }`}>
-                    {p.action ?? "ACCEPT"}
-                  </span>
                   <span className="text-xs text-muted-foreground uppercase">{p.protocol}</span>
                   <span className="font-mono text-sm font-semibold">{p.internal_port}</span>
                   {p.source && p.source !== "0.0.0.0/0" && (

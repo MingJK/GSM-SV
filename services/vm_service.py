@@ -17,6 +17,7 @@ from models.user import User, UserRole
 from services.proxmox_client import get_proxmox_for_server
 from services.network_service import manage_iptables, manage_custom_iptables, calculate_ports
 from models.notification import Notification
+from models.vm_port import VmPort
 
 logger = logging.getLogger(__name__)
 
@@ -432,7 +433,6 @@ def create_vm(
         db.flush()  # new_vm.id 확보
 
         # 기본 포트 3개를 VmPort로 저장 (방화벽 탭에서 조회/삭제 가능)
-        from models.vm_port import VmPort
         default_ports = calculate_ports(server.base_port, vmid)
         for internal_port, protocol, description, external_port in [
             (22,    "tcp",     "SSH",  default_ports["ssh"]),
@@ -534,7 +534,6 @@ def delete_vm(
         proxmox.nodes(server.name).qemu(vmid).delete(**delete_params)
 
         # 커스텀 포트 iptables 규칙 제거
-        from models.vm_port import VmPort
         if vm_record.internal_ip:
             custom_ports = db.query(VmPort).filter(
                 VmPort.vm_id == vm_record.id,
