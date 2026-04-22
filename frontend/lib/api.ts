@@ -359,7 +359,7 @@ interface VmPortsResponse {
 }
 
 export async function getVmPorts(node: string, vmid: number): Promise<PortInfo[]> {
-  const res = await api<VmPortsResponse>(`/network/${node}/${vmid}/ports`);
+  const res = await api<VmPortsResponse>(`/network/${encodeURIComponent(node)}/${vmid}/ports`);
   return res.ports ?? [];
 }
 
@@ -402,7 +402,7 @@ export interface VmPort {
 }
 
 export async function getCustomPorts(node: string, vmid: number): Promise<VmPort[]> {
-  const res = await api<{ vmid: number; ports: VmPort[] }>(`/firewall/${node}/${vmid}/ports`);
+  const res = await api<{ vmid: number; ports: VmPort[] }>(`/firewall/${encodeURIComponent(node)}/${vmid}/ports`);
   return res.ports ?? [];
 }
 
@@ -411,11 +411,11 @@ export async function addCustomPort(
   vmid: number,
   body: { internal_port: number; protocol: string; source?: string; description?: string }
 ): Promise<VmPort> {
-  return api<VmPort>(`/firewall/${node}/${vmid}/ports`, { method: "POST", body });
+  return api<VmPort>(`/firewall/${encodeURIComponent(node)}/${vmid}/ports`, { method: "POST", body });
 }
 
 export async function deleteCustomPort(node: string, vmid: number, portId: number) {
-  return api(`/firewall/${node}/${vmid}/ports/${portId}`, { method: "DELETE" });
+  return api(`/firewall/${encodeURIComponent(node)}/${vmid}/ports/${portId}`, { method: "DELETE" });
 }
 
 // ── VM 연장 API ─────────────────────────────────────────────
