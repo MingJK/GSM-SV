@@ -4,6 +4,7 @@ import logging
 import re
 from datetime import timedelta
 from core.timezone import now_kst
+from typing import Any
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from sqlalchemy.orm import Session
 from schemas.vm_schema import VMAction, VMCreate, VMResize
@@ -168,7 +169,7 @@ async def get_my_vms(
         server_vms[vm.server_id].append(vm)
 
     result = []
-    proxmox_cache: dict[int, any] = {}
+    proxmox_cache: dict[int, Any] = {}
 
     for vm in user_vms:
         info = {
