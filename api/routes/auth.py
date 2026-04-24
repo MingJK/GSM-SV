@@ -338,9 +338,9 @@ async def verify_email(request: Request, body: VerifyCodeRequest, db: Session = 
         project_name=record.project_name if is_project_owner else None,
         project_reason=record.project_reason if is_project_owner else None,
     )
-    db.delete(record)
-    db.add(new_user)
     try:
+        db.delete(record)
+        db.add(new_user)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -468,7 +468,8 @@ async def resend_code(request: Request, body: ResendCodeRequest, db: Session = D
     db.query(EmailVerification).filter(
         EmailVerification.email == body.email,
         EmailVerification.verified == False,
-    ).delete()
+        EmailVerification.signup_role == signup_role,
+    ).delete(synchronize_session="fetch")
 
     new_code = generate_verification_code()
     new_record = EmailVerification(
@@ -482,11 +483,14 @@ async def resend_code(request: Request, body: ResendCodeRequest, db: Session = D
         expires_at=now_kst() + timedelta(minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES),
     )
     db.add(new_record)
-    db.commit()
+    db.flush()
 
     sent = await send_verification_email(body.email, new_code)
     if not sent:
+        db.rollback()
         raise HTTPException(status_code=500, detail="인증 이메일 발송에 실패했습니다.")
+
+    db.commit()
 
     return {
         "message": "새 인증 코드가 발송되었습니다.",
