@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +26,7 @@ export function FirewallTab({
   ports?: PortInfo[]
 }) {
   const [copiedId, setCopiedId] = useState<number | null>(null)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [customPorts, setCustomPorts] = useState<VmPort[]>([])
   const [loading, setLoading] = useState(true)
   const [portsOpen, setPortsOpen] = useState(true)
@@ -59,11 +60,18 @@ export function FirewallTab({
     fetchPorts()
   }, [fetchPorts])
 
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [])
+
   const handleCopy = async (text: string, id: number) => {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedId(id)
-      setTimeout(() => setCopiedId(null), 1500)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopiedId(null), 1500)
     } catch {
       // 복사 실패 시 조용히 무시
     }
