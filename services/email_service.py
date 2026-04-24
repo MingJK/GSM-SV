@@ -2,11 +2,14 @@
 이메일 발송 서비스 — SMTP를 통해 인증 코드를 전송합니다.
 """
 
+import logging
 import secrets
 import string
 import aiosmtplib
 from email.message import EmailMessage
 from core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def generate_verification_code() -> str:
@@ -63,5 +66,5 @@ async def send_verification_email(to_email: str, code: str) -> bool:
         )
         return True
     except Exception as e:
-        print(f"[이메일 발송 실패] {to_email}: {e}")
+        logger.error("[이메일 발송 실패] %s: %s", to_email[:3] + "***", e)
         return False

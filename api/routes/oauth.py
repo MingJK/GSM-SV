@@ -107,7 +107,7 @@ async def oauth_callback(
         )
 
         if token_res.status_code != 200:
-            logger.error(f"[OAuth] 토큰 교환 실패: {token_res.text}")
+            logger.error(f"[OAuth] 토큰 교환 실패: HTTP {token_res.status_code}")
             raise HTTPException(status_code=400, detail="토큰 교환에 실패했습니다.")
 
         token_data = token_res.json()
