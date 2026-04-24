@@ -638,10 +638,13 @@ async def confirm_password_reset(request: Request, body: PasswordResetConfirm, d
     if now_kst() > record.expires_at:
         raise HTTPException(status_code=400, detail="인증 코드가 만료되었습니다. 다시 요청해주세요.")
 
-    if record.code != body.code.strip():
-        raise HTTPException(status_code=400, detail="인증 코드가 일치하지 않습니다.")
+    if record.attempts >= 5:
+        raise HTTPException(status_code=400, detail="인증 시도 횟수를 초과했습니다. 다시 요청해주세요.")
 
-    record.verified = True
+    if record.code != body.code.strip():
+        record.attempts = (record.attempts or 0) + 1
+        db.commit()
+        raise HTTPException(status_code=400, detail="인증 코드가 일치하지 않습니다.")
 
     # 해당 이메일의 모든 활성 계정 비밀번호 변경
     users = db.query(User).filter(User.email == body.email, User.is_active == True).all()
@@ -652,6 +655,7 @@ async def confirm_password_reset(request: Request, body: PasswordResetConfirm, d
     for user in users:
         user.hashed_password = new_hash
 
+    db.delete(record)
     db.commit()
 
     return {"message": "비밀번호가 성공적으로 변경되었습니다."}
