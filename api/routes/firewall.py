@@ -225,6 +225,7 @@ async def restore_default_ports(
                     action="ADD",
                 )
                 if not success:
+                    # Lenient 정책: iptables 실패가 DB 저장을 막지 않음 — 주기적 동기화로 복구 필요
                     logger.error(f"[firewall] 기본 포트 복원 iptables 실패 — {description} ({proto}), DB 저장은 계속 진행")
     try:
         db.commit()
@@ -252,8 +253,8 @@ async def delete_custom_port(
     if not vm_port:
         raise HTTPException(status_code=404, detail="포트를 찾을 수 없습니다.")
 
-    # iptables 규칙 삭제 ("tcp/udp" 프로토콜은 두 번 호출)
-    # 실패해도 DB 레코드는 삭제 — 삭제 실패 시 영구적으로 못 지우는 것이 더 위험
+    # Strict 정책: iptables 삭제 실패 시 DB 삭제를 진행하지 않고 즉시 500 반환
+    # iptables 규칙이 남아있는데 DB에서만 삭제되면 실제 트래픽 차단이 불가능해지므로 일관성 우선
     if vm.internal_ip:
         # ADD 시 source_ip와 동일한 값으로 DELETE — "0.0.0.0/0"은 플래그 없이 추가된 것이므로 None 처리
         source_ip = vm_port.source if vm_port.source and vm_port.source != "0.0.0.0/0" else None
@@ -269,7 +270,8 @@ async def delete_custom_port(
                 source_ip=source_ip,
             )
             if not success:
-                logger.error(f"[firewall] Gateway iptables 삭제 실패 — port {vm_port.external_port} ({proto}), DB 레코드는 삭제 진행")
+                logger.error(f"[firewall] Gateway iptables 삭제 실패 — port {vm_port.external_port} ({proto}), DB 삭제 취소")
+                raise HTTPException(status_code=500, detail="iptables 규칙 삭제에 실패했습니다. 포트 삭제를 취소합니다.")
 
     external_port = vm_port.external_port
     internal_port = vm_port.internal_port
