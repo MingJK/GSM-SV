@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Literal, Optional
 from enum import Enum
 
 class VMTier(str, Enum):
@@ -16,7 +16,7 @@ class VMOs(str, Enum):
 
 class VMAction(BaseModel):
     """VM/컨테이너 제어 액션 모델"""
-    action: str  # "start", "stop", "shutdown", "reboot" 중 하나
+    action: Literal["start", "stop", "shutdown", "reboot"]
 
 class VMResize(BaseModel):
     """VM 사양 변경 요청 모델 (핫플러그)"""
