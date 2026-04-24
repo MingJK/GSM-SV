@@ -32,6 +32,7 @@ async def _expire_vms_loop():
     from services.vm_service import delete_vm
     from datetime import timedelta
 
+    consecutive_failures = 0
     while True:
         db = SessionLocal()
         try:
@@ -91,12 +92,17 @@ async def _expire_vms_loop():
                 Notification.created_at < cutoff,
             ).delete()
             db.commit()
+            consecutive_failures = 0
         except Exception as e:
-            logger.error(f"[expire] 백그라운드 태스크 오류: {e}")
+            consecutive_failures += 1
+            logger.error(f"[expire] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
+            if consecutive_failures >= 5:
+                logger.critical(f"[expire] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
         finally:
             db.close()
 
-        await asyncio.sleep(3600)  # 1시간마다 확인
+        retry_interval = 300 if consecutive_failures > 0 else 3600
+        await asyncio.sleep(retry_interval)
 
 
 async def _iptables_weekly_backup_loop():
@@ -148,6 +154,7 @@ async def _daily_snapshot_loop():
     """
     from services.proxmox_client import get_proxmox_for_server
 
+    consecutive_failures = 0
     while True:
         try:
             now = now_kst()
@@ -192,9 +199,14 @@ async def _daily_snapshot_loop():
                         logger.warning(f"[auto-snap] 생성 실패 ({vm.name}): {e}")
             finally:
                 db.close()
+            consecutive_failures = 0
         except Exception as e:
-            logger.error(f"[auto-snap] 백그라운드 태스크 오류: {e}")
-            await asyncio.sleep(3600)
+            consecutive_failures += 1
+            logger.error(f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
+            if consecutive_failures >= 5:
+                logger.critical(f"[auto-snap] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
+            retry_interval = 300 if consecutive_failures > 0 else 3600
+            await asyncio.sleep(retry_interval)
 
 
 async def _oauth_store_cleanup_loop():
