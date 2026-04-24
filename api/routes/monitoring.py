@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from services.proxmox_client import get_proxmox_for_server
 from core.database import get_db
 from models.server import Server
-from models.user import User
+from models.user import User, UserRole
+from models.vm import Vm
 from api.dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
@@ -16,10 +17,23 @@ async def get_system_stats(
     current_user: User = Depends(get_current_user)
 ):
     """
-    플랫폼에 등록된 모든 활성 서버(Node)의 리소스 취합 조회 (USER/ADMIN 모두 가능)
-    VM 생성 전 사용자가 직접 노드별 사용률을 확인하기 위해 사용됩니다.
+    활성 서버(Node)의 리소스 취합 조회.
+    ADMIN: 전체 노드 조회 / USER: 본인 VM이 위치한 노드만 조회
     """
-    servers = db.query(Server).filter(Server.is_active == True).all()
+    if current_user.role == UserRole.ADMIN:
+        servers = db.query(Server).filter(Server.is_active == True).all()
+    else:
+        user_server_ids = (
+            db.query(Vm.server_id)
+            .filter(Vm.owner_id == current_user.id)
+            .distinct()
+            .subquery()
+        )
+        servers = (
+            db.query(Server)
+            .filter(Server.id.in_(user_server_ids), Server.is_active == True)
+            .all()
+        )
     if not servers:
         return {"message": "등록된 활성 서버가 없습니다.", "stats": {}}
         
