@@ -1,3 +1,4 @@
+import time
 from sqlalchemy.orm import Session
 from models.server import Server
 from services.proxmox_client import get_proxmox_for_server
@@ -5,6 +6,9 @@ from fastapi import HTTPException
 import logging
 
 logger = logging.getLogger(__name__)
+
+_server_stat_ts: dict[str, float] = {}
+_SERVER_STAT_TTL = 300
 
 def update_server_stats(db: Session, server: Server):
     """
@@ -41,10 +45,13 @@ def get_best_server(db: Session, required_ram_mb: int) -> Server:
     if not active_servers:
         raise HTTPException(status_code=500, detail="사용 가능한 활성 서버가 없습니다.")
     
-    # 2. (옵션) 실시간에 가깝게 하기 위해 할당 전 모든 서버의 RAM 상태를 1회 갱신 (트래픽이 적을 때 유효)
-    # 트래픽이 많다면 이 부분은 백그라운드 스케줄러(ex: Celery, APScheduler)로 빼는 것이 좋습니다.
+    # 2. 마지막 갱신 후 TTL이 지난 서버만 RAM 상태 갱신
+    now = time.time()
     for server in active_servers:
-        update_server_stats(db, server)
+        last_ts = _server_stat_ts.get(server.name, 0)
+        if now - last_ts >= _SERVER_STAT_TTL:
+            update_server_stats(db, server)
+            _server_stat_ts[server.name] = now
         
     # 3. 요구사항을 충족(required_ram_mb 이상 여유)하는 서버들만 필터링
     capable_servers = [s for s in active_servers if s.last_free_ram_mb >= required_ram_mb]
