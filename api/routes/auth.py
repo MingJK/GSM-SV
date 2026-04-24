@@ -5,6 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 from core.timezone import now_kst
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File
+from sqlalchemy.exc import IntegrityError
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel as _BM
@@ -316,10 +317,7 @@ async def verify_email(request: Request, body: VerifyCodeRequest, db: Session = 
     if existing:
         raise HTTPException(status_code=400, detail="이미 가입된 계정입니다.")
 
-    record.verified = True
-    db.commit()
-
-    # 학생 정보 복원
+    # 학생 정보 복원 (삭제 전에 읽기)
     student_info = {}
     if record.student_info:
         try:
@@ -340,8 +338,13 @@ async def verify_email(request: Request, body: VerifyCodeRequest, db: Session = 
         project_name=record.project_name if is_project_owner else None,
         project_reason=record.project_reason if is_project_owner else None,
     )
+    db.delete(record)
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="이미 가입된 계정입니다.")
     db.refresh(new_user)
 
     if is_project_owner:
@@ -442,7 +445,7 @@ async def reject_project_owner(
 @limiter.limit("3/minute")
 async def resend_code(request: Request, body: ResendCodeRequest, db: Session = Depends(get_db)):
     """인증 코드를 재발송합니다."""
-    record = (
+    latest = (
         db.query(EmailVerification)
         .filter(
             EmailVerification.email == body.email,
@@ -452,12 +455,33 @@ async def resend_code(request: Request, body: ResendCodeRequest, db: Session = D
         .first()
     )
 
-    if not record:
+    if not latest:
         raise HTTPException(status_code=400, detail="인증 대기 중인 요청이 없습니다.")
 
+    # 기존 미인증 레코드를 모두 삭제하고 새 레코드 삽입
+    signup_role = latest.signup_role
+    hashed_password = latest.hashed_password
+    student_info = latest.student_info
+    project_name = latest.project_name
+    project_reason = latest.project_reason
+
+    db.query(EmailVerification).filter(
+        EmailVerification.email == body.email,
+        EmailVerification.verified == False,
+    ).delete()
+
     new_code = generate_verification_code()
-    record.code = new_code
-    record.expires_at = now_kst() + timedelta(minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES)
+    new_record = EmailVerification(
+        email=body.email,
+        hashed_password=hashed_password,
+        code=new_code,
+        student_info=student_info,
+        signup_role=signup_role,
+        project_name=project_name,
+        project_reason=project_reason,
+        expires_at=now_kst() + timedelta(minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES),
+    )
+    db.add(new_record)
     db.commit()
 
     sent = await send_verification_email(body.email, new_code)
