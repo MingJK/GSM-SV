@@ -23,6 +23,10 @@ class VMResize(BaseModel):
     cores: Optional[int] = None    # vCPU 수
     memory: Optional[int] = None   # RAM (MB 단위)
 
+class SnapshotCreateRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+
 class VMCreate(BaseModel):
     """VM 생성 요청 모델 — 사용자는 os, tier와 선택적으로 node_name만 입력"""
     tier: VMTier = VMTier.MICRO
