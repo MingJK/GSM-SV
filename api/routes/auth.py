@@ -483,14 +483,11 @@ async def resend_code(request: Request, body: ResendCodeRequest, db: Session = D
         expires_at=now_kst() + timedelta(minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES),
     )
     db.add(new_record)
-    db.flush()
+    db.commit()
 
     sent = await send_verification_email(body.email, new_code)
     if not sent:
-        db.rollback()
         raise HTTPException(status_code=500, detail="인증 이메일 발송에 실패했습니다.")
-
-    db.commit()
 
     return {
         "message": "새 인증 코드가 발송되었습니다.",
