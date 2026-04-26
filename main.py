@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from api.routes import vmcontrol, firewall, auth, monitoring, network, notifications, oauth, faq
 from core.config import settings
+from sqlalchemy.orm import joinedload
 from core.database import Base, engine, SessionLocal
 from core.init_servers import sync_servers
 from models.vm import Vm
@@ -140,10 +141,23 @@ async def _iptables_weekly_backup_loop():
 AUTO_SNAP_PREFIX = "auto-daily"
 
 
+async def _wait_snap_delete(proxmox, node_name: str, upid: str, timeout: int = 60) -> None:
+    """스냅샷 삭제 UPID 완료를 비동기로 대기합니다."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            task = proxmox.nodes(node_name).tasks(upid).status.get()
+            if task.get("status") == "stopped":
+                return
+        except Exception:
+            pass
+        await asyncio.sleep(2)
+
+
 async def _daily_snapshot_loop():
     """
     매일 자동 스냅샷 (auto_snapshot=True인 VM만)
-    - 00:00 → 기존 auto-daily 스냅샷 삭제 (UPID 완료 대기)
+    - 00:00 → 기존 auto-daily 스냅샷 삭제 (UPID 완료를 gather로 병렬 대기)
     - 00:01 → 새 auto-daily 스냅샷 생성 (target_vms 재조회)
     """
     from services.proxmox_client import get_proxmox_for_server
@@ -159,13 +173,13 @@ async def _daily_snapshot_loop():
             logger.info("[auto-snap] 기존 자동 스냅샷 삭제 시작")
             db = SessionLocal()
             try:
-                vms = db.query(Vm).filter(Vm.auto_snapshot == True).all()
-                # 세션 종료 전 필요한 데이터 추출
+                vms = db.query(Vm).options(joinedload(Vm.server)).filter(Vm.auto_snapshot == True).all()
                 delete_targets = [(vm.name, vm.hypervisor_vmid, vm.server) for vm in vms]
                 db.expunge_all()
             finally:
                 db.close()
 
+            wait_tasks = []
             for vm_name, vmid, server in delete_targets:
                 try:
                     proxmox = get_proxmox_for_server(server)
@@ -174,19 +188,13 @@ async def _daily_snapshot_loop():
                         if snap.get("name", "").startswith(AUTO_SNAP_PREFIX):
                             upid = proxmox.nodes(server.name).qemu(vmid).snapshot(snap["name"]).delete()
                             logger.info(f"[auto-snap] 삭제 요청: {vm_name} / {snap['name']}")
-                            # 삭제 태스크 완료 대기 (최대 60초)
                             if isinstance(upid, str):
-                                deadline = asyncio.get_event_loop().time() + 60
-                                while asyncio.get_event_loop().time() < deadline:
-                                    try:
-                                        task = proxmox.nodes(server.name).tasks(upid).status.get()
-                                        if task.get("status") == "stopped":
-                                            break
-                                    except Exception:
-                                        pass
-                                    await asyncio.sleep(2)
+                                wait_tasks.append(_wait_snap_delete(proxmox, server.name, upid))
                 except Exception as e:
                     logger.warning(f"[auto-snap] 삭제 실패 ({vm_name}): {e}")
+
+            if wait_tasks:
+                await asyncio.gather(*wait_tasks, return_exceptions=True)
 
             # ── 00:01 — 새 스냅샷 생성 ──
             await asyncio.sleep(60)
@@ -198,7 +206,7 @@ async def _daily_snapshot_loop():
             # 생성 직전 재조회 — sleep 사이 auto_snapshot 변경분 반영
             db = SessionLocal()
             try:
-                vms = db.query(Vm).filter(Vm.auto_snapshot == True).all()
+                vms = db.query(Vm).options(joinedload(Vm.server)).filter(Vm.auto_snapshot == True).all()
                 create_targets = [(vm.name, vm.hypervisor_vmid, vm.server) for vm in vms]
                 db.expunge_all()
             finally:
