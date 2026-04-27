@@ -141,10 +141,11 @@ async def _iptables_weekly_backup_loop():
 AUTO_SNAP_PREFIX = "auto-daily"
 
 
-async def _wait_snap_delete(proxmox, node_name: str, upid: str, timeout: int = 60) -> None:
+async def _wait_snap_delete(proxmox, node_name: str, upid: str, timeout: int = 120) -> None:
     """스냅샷 삭제 UPID 완료를 비동기로 대기합니다."""
-    deadline = asyncio.get_event_loop().time() + timeout
-    while asyncio.get_event_loop().time() < deadline:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
         try:
             task = proxmox.nodes(node_name).tasks(upid).status.get()
             if task.get("status") == "stopped":

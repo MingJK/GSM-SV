@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from enum import Enum
 
@@ -24,7 +24,7 @@ class VMResize(BaseModel):
     memory: Optional[int] = None   # RAM (MB 단위)
 
 class SnapshotCreateRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=40)
     description: Optional[str] = ""
 
 class VMCreate(BaseModel):
