@@ -24,7 +24,7 @@ class VMResize(BaseModel):
     memory: Optional[int] = None   # RAM (MB 단위)
 
 class SnapshotCreateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=40, pattern=r"^[a-zA-Z0-9가-힣_-]+$")
+    name: str = Field(min_length=1, max_length=40, pattern=r"^[a-zA-Z][a-zA-Z0-9_-]*$")
     description: Optional[str] = ""
 
 class VMCreate(BaseModel):
