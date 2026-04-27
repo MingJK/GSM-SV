@@ -458,6 +458,7 @@ async def resend_code(request: Request, body: ResendCodeRequest, db: Session = D
     new_code = generate_verification_code()
     record.code = new_code
     record.expires_at = now_kst() + timedelta(minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES)
+    record.attempts = 0
     db.commit()
 
     sent = await send_verification_email(body.email, new_code)
@@ -591,6 +592,17 @@ async def request_password_reset(request: Request, body: PasswordResetRequest, d
         # 보안상 존재하지 않는 이메일이어도 같은 메시지 반환
         return {"message": "등록된 이메일이라면 인증 코드가 발송됩니다.", "email": body.email}
 
+    # 잠긴 레코드(attempts >= 5, 미만료)가 있으면 재발송 거부
+    locked = db.query(EmailVerification).filter(
+        EmailVerification.email == body.email,
+        EmailVerification.signup_role == "password_reset",
+        EmailVerification.verified == False,
+        EmailVerification.attempts >= 5,
+        EmailVerification.expires_at > now_kst(),
+    ).first()
+    if locked:
+        raise HTTPException(status_code=429, detail="인증 시도 횟수를 초과했습니다. 다시 요청해주세요.")
+
     # 기존 미인증 비밀번호 재설정 레코드 삭제
     db.query(EmailVerification).filter(
         EmailVerification.email == body.email,
@@ -629,6 +641,7 @@ async def confirm_password_reset(request: Request, body: PasswordResetConfirm, d
             EmailVerification.verified == False,
         )
         .order_by(EmailVerification.created_at.desc())
+        .with_for_update()
         .first()
     )
 
