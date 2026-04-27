@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from api.routes import vmcontrol, firewall, auth, monitoring, network, notifications, oauth, faq
 from core.config import settings
+from sqlalchemy.orm import joinedload
 from core.database import Base, engine, SessionLocal
 from core.init_servers import sync_servers
 from models.vm import Vm
@@ -140,11 +141,28 @@ async def _iptables_weekly_backup_loop():
 AUTO_SNAP_PREFIX = "auto-daily"
 
 
+async def _wait_snap_delete(proxmox, node_name: str, upid: str, timeout: int = 120) -> None:
+    """스냅샷 삭제 UPID 완료를 비동기로 대기합니다."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        try:
+            task = await asyncio.to_thread(proxmox.nodes(node_name).tasks(upid).status.get)
+            if task.get("status") == "stopped":
+                if task.get("exitstatus") != "OK":
+                    logger.warning(f"[auto-snap] 삭제 태스크 비정상 종료: {upid} exitstatus={task.get('exitstatus')}")
+                return
+        except Exception as e:
+            logger.debug(f"[auto-snap] UPID {upid} 상태 조회 실패: {e}")
+        await asyncio.sleep(2)
+    logger.warning(f"[auto-snap] 삭제 UPID {upid} 타임아웃 ({timeout}초) — 생성 단계에서 충돌 가능")
+
+
 async def _daily_snapshot_loop():
     """
     매일 자동 스냅샷 (auto_snapshot=True인 VM만)
-    - 00:00 → 기존 auto-daily 스냅샷 삭제
-    - 00:10 → 새 auto-daily 스냅샷 생성
+    - 00:00 → 기존 auto-daily 스냅샷 삭제 (UPID 완료를 gather로 병렬 대기)
+    - 00:01 → 새 auto-daily 스냅샷 생성 (target_vms 재조회)
     """
     from services.proxmox_client import get_proxmox_for_server
 
@@ -159,39 +177,57 @@ async def _daily_snapshot_loop():
             logger.info("[auto-snap] 기존 자동 스냅샷 삭제 시작")
             db = SessionLocal()
             try:
-                target_vms = db.query(Vm).filter(Vm.auto_snapshot == True).all()
-
-                for vm in target_vms:
-                    try:
-                        proxmox = get_proxmox_for_server(vm.server)
-                        snapshots = proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.get()
-                        for snap in snapshots:
-                            if snap.get("name", "").startswith(AUTO_SNAP_PREFIX):
-                                proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot(snap["name"]).delete()
-                                logger.info(f"[auto-snap] 삭제: {vm.name} / {snap['name']}")
-                    except Exception as e:
-                        logger.warning(f"[auto-snap] 삭제 실패 ({vm.name}): {e}")
-
-                # ── 00:10 — 새 스냅샷 생성 ──
-                await asyncio.sleep(600)
-
-                today_str = now_kst().strftime("%Y%m%d")
-                snap_name = f"{AUTO_SNAP_PREFIX}-{today_str}"
-                logger.info(f"[auto-snap] 자동 스냅샷 생성 시작: {snap_name}")
-
-                for vm in target_vms:
-                    try:
-                        proxmox = get_proxmox_for_server(vm.server)
-                        proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.post(
-                            snapname=snap_name,
-                            description="자동 일일 스냅샷",
-                            vmstate=0,
-                        )
-                        logger.info(f"[auto-snap] 생성: {vm.name} / {snap_name}")
-                    except Exception as e:
-                        logger.warning(f"[auto-snap] 생성 실패 ({vm.name}): {e}")
+                vms = db.query(Vm).options(joinedload(Vm.server)).filter(Vm.auto_snapshot == True).all()
+                delete_targets = [(vm.name, vm.hypervisor_vmid, vm.server) for vm in vms]
+                db.expunge_all()
             finally:
                 db.close()
+
+            wait_tasks = []
+            for vm_name, vmid, server in delete_targets:
+                try:
+                    proxmox = get_proxmox_for_server(server)
+                    snapshots = proxmox.nodes(server.name).qemu(vmid).snapshot.get()
+                    for snap in snapshots:
+                        if snap.get("name", "").startswith(AUTO_SNAP_PREFIX):
+                            upid = proxmox.nodes(server.name).qemu(vmid).snapshot(snap["name"]).delete()
+                            logger.info(f"[auto-snap] 삭제 요청: {vm_name} / {snap['name']}")
+                            if isinstance(upid, str):
+                                wait_tasks.append(_wait_snap_delete(proxmox, server.name, upid))
+                except Exception as e:
+                    logger.warning(f"[auto-snap] 삭제 실패 ({vm_name}): {e}")
+
+            if wait_tasks:
+                await asyncio.gather(*wait_tasks, return_exceptions=True)
+
+            # ── 00:01 — 새 스냅샷 생성 ──
+            await asyncio.sleep(60)
+
+            today_str = now_kst().strftime("%Y%m%d")
+            snap_name = f"{AUTO_SNAP_PREFIX}-{today_str}"
+            logger.info(f"[auto-snap] 자동 스냅샷 생성 시작: {snap_name}")
+
+            # 생성 직전 재조회 — sleep 사이 auto_snapshot 변경분 반영
+            db = SessionLocal()
+            try:
+                vms = db.query(Vm).options(joinedload(Vm.server)).filter(Vm.auto_snapshot == True).all()
+                create_targets = [(vm.name, vm.hypervisor_vmid, vm.server) for vm in vms]
+                db.expunge_all()
+            finally:
+                db.close()
+
+            for vm_name, vmid, server in create_targets:
+                try:
+                    proxmox = get_proxmox_for_server(server)
+                    proxmox.nodes(server.name).qemu(vmid).snapshot.post(
+                        snapname=snap_name,
+                        description="자동 일일 스냅샷",
+                        vmstate=0,
+                    )
+                    logger.info(f"[auto-snap] 생성: {vm_name} / {snap_name}")
+                except Exception as e:
+                    logger.warning(f"[auto-snap] 생성 실패 ({vm_name}): {e}")
+
         except Exception as e:
             logger.error(f"[auto-snap] 백그라운드 태스크 오류: {e}")
             await asyncio.sleep(3600)

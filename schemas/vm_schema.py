@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from enum import Enum
 
@@ -22,6 +22,10 @@ class VMResize(BaseModel):
     """VM 사양 변경 요청 모델 (핫플러그)"""
     cores: Optional[int] = None    # vCPU 수
     memory: Optional[int] = None   # RAM (MB 단위)
+
+class SnapshotCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=40, pattern=r"^[a-zA-Z][a-zA-Z0-9_-]*$")
+    description: str = ""
 
 class VMCreate(BaseModel):
     """VM 생성 요청 모델 — 사용자는 os, tier와 선택적으로 node_name만 입력"""
