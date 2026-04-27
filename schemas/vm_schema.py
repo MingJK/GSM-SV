@@ -25,7 +25,7 @@ class VMResize(BaseModel):
 
 class SnapshotCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=40, pattern=r"^[a-zA-Z][a-zA-Z0-9_-]*$")
-    description: Optional[str] = ""
+    description: str = ""
 
 class VMCreate(BaseModel):
     """VM 생성 요청 모델 — 사용자는 os, tier와 선택적으로 node_name만 입력"""

@@ -152,9 +152,10 @@ async def _wait_snap_delete(proxmox, node_name: str, upid: str, timeout: int = 1
                 if task.get("exitstatus") != "OK":
                     logger.warning(f"[auto-snap] 삭제 태스크 비정상 종료: {upid} exitstatus={task.get('exitstatus')}")
                 return
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"[auto-snap] UPID {upid} 상태 조회 실패: {e}")
         await asyncio.sleep(2)
+    logger.warning(f"[auto-snap] 삭제 UPID {upid} 타임아웃 ({timeout}초) — 생성 단계에서 충돌 가능")
 
 
 async def _daily_snapshot_loop():
