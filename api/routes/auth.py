@@ -639,7 +639,7 @@ async def confirm_password_reset(request: Request, body: PasswordResetConfirm, d
         raise HTTPException(status_code=400, detail="인증 코드가 만료되었습니다. 다시 요청해주세요.")
 
     if record.attempts >= 5:
-        raise HTTPException(status_code=400, detail="인증 시도 횟수를 초과했습니다. 다시 요청해주세요.")
+        raise HTTPException(status_code=429, detail="인증 시도 횟수를 초과했습니다. 다시 요청해주세요.")
 
     if record.code != body.code.strip():
         record.attempts = (record.attempts or 0) + 1
