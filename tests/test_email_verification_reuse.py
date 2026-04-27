@@ -19,7 +19,8 @@ engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
 TestSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # SQLite 호환 naive datetime 반환
-_naive_now = lambda: datetime.utcnow()
+def _naive_now():
+    return datetime.utcnow()
 
 
 def get_test_app():
