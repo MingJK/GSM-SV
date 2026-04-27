@@ -147,8 +147,10 @@ async def _wait_snap_delete(proxmox, node_name: str, upid: str, timeout: int = 1
     deadline = loop.time() + timeout
     while loop.time() < deadline:
         try:
-            task = proxmox.nodes(node_name).tasks(upid).status.get()
+            task = await asyncio.to_thread(proxmox.nodes(node_name).tasks(upid).status.get)
             if task.get("status") == "stopped":
+                if task.get("exitstatus") != "OK":
+                    logger.warning(f"[auto-snap] 삭제 태스크 비정상 종료: {upid} exitstatus={task.get('exitstatus')}")
                 return
         except Exception:
             pass

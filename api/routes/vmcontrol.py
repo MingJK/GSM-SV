@@ -497,13 +497,7 @@ async def create_snapshot(
     node = vm_record.server.name
     proxmox = get_proxmox_for_server(vm_record.server)
 
-    snap_name = body.name.strip()
-    if not snap_name:
-        raise HTTPException(status_code=400, detail="스냅샷 이름을 입력해주세요.")
-    if len(snap_name) > 40:
-        raise HTTPException(status_code=400, detail="스냅샷 이름은 40자 이내로 입력해주세요.")
-    if not re.match(r'^[a-zA-Z0-9가-힣_-]+$', snap_name):
-        raise HTTPException(status_code=400, detail="스냅샷 이름은 영문, 숫자, 한글, _, -만 사용할 수 있습니다.")
+    snap_name = body.name
 
     try:
         existing = proxmox.nodes(node).qemu(vmid).snapshot.get()
