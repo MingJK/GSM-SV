@@ -96,8 +96,8 @@ class TestEmailVerificationReuse:
         """/resend-code 호출 후 이전 코드로 인증 불가"""
         _insert_verification("reuse2@gsm.hs.kr", "222222")
 
-        with patch("api.routes.auth.now_kst", _naive_now):
-            # 이메일 발송 실패(500)여도 DB 커밋은 완료됨
+        with patch("api.routes.auth.now_kst", _naive_now), \
+             patch("api.routes.auth.send_verification_email", return_value=True):
             client.post("/api/v1/auth/resend-code", json={"email": "reuse2@gsm.hs.kr"})
 
             # 이전 코드로 인증 시도 → 최신 레코드와 코드 불일치 → 400
