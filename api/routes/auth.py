@@ -482,8 +482,12 @@ async def resend_code(request: Request, body: ResendCodeRequest, db: Session = D
         project_reason=project_reason,
         expires_at=now_kst() + timedelta(minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES),
     )
-    db.add(new_record)
-    db.commit()
+    try:
+        db.add(new_record)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="잠시 후 다시 시도해주세요.")
 
     sent = await send_verification_email(body.email, new_code)
     if not sent:
