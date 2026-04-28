@@ -26,7 +26,7 @@ async def get_system_stats(
             db.query(Vm.server_id)
             .filter(Vm.owner_id == current_user.id)
             .distinct()
-            .subquery()
+            .scalar_subquery()
         )
         query = query.filter(Server.id.in_(user_server_ids))
     servers = query.all()
