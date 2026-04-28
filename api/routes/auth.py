@@ -658,7 +658,7 @@ async def confirm_password_reset(request: Request, body: PasswordResetConfirm, d
             EmailVerification.verified == False,
         )
         .order_by(EmailVerification.created_at.desc())
-        .with_for_update()
+        .with_for_update()  # request_password_reset이 삭제 후 재생성하므로 단일 레코드 보장
         .first()
     )
 
@@ -669,7 +669,11 @@ async def confirm_password_reset(request: Request, body: PasswordResetConfirm, d
         raise HTTPException(status_code=400, detail="인증 코드가 만료되었습니다. 다시 요청해주세요.")
 
     if (record.attempts or 0) >= 5:
-        raise HTTPException(status_code=429, detail="인증 시도 횟수를 초과했습니다. 다시 요청해주세요.")
+        raise HTTPException(
+            status_code=429,
+            detail="인증 시도 횟수를 초과했습니다. 새 코드를 요청해주세요.",
+            headers={"Retry-After": "0"},
+        )
 
     if record.code != body.code.strip():
         record.attempts = (record.attempts or 0) + 1

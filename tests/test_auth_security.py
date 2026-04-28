@@ -5,10 +5,13 @@ Domain 2: 인증 및 권한 테스트 (AUTH-TC-01 ~ AUTH-TC-08)
 """
 import pytest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from core.database import Base
+from core.database import Base, get_db
 from models.user import User, UserRole
 from models.server import Server
 from models.vm import Vm
@@ -16,7 +19,6 @@ from models.email_verification import EmailVerification
 from core.security import create_access_token, create_refresh_token
 from core.timezone import now_kst
 from api.dependencies import get_vm_with_owner_check
-from fastapi import HTTPException
 
 # ── 테스트용 DB ────────────────────────────────────────────────
 
@@ -371,3 +373,139 @@ class TestPortRangeValidation:
         from services.network_service import calculate_ports
         with pytest.raises(ValueError):
             calculate_ports(63000, 1000)  # svc2 = 63000+2000+1000 = 66000 > 65535
+
+
+# ── AUTH-TC-01/02 HTTP 통합 테스트 ────────────────────────────
+# SQLite는 timezone-aware datetime 미지원 → now_kst를 naive로 패치
+
+def _naive_now():
+    return datetime.utcnow()
+
+
+def _get_auth_app():
+    from api.routes import auth as auth_module
+    _app = FastAPI()
+    _app.include_router(auth_module.router, prefix="/api/v1/auth")
+
+    def _override_db():
+        db = TestSession()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    _app.dependency_overrides[get_db] = _override_db
+    return _app
+
+
+def _insert_reset_record(email: str, code: str, attempts: int = 0) -> None:
+    db = TestSession()
+    try:
+        db.query(EmailVerification).filter_by(email=email, signup_role="password_reset").delete()
+        db.commit()
+        db.add(EmailVerification(
+            email=email,
+            hashed_password="",
+            code=code,
+            signup_role="password_reset",
+            expires_at=datetime.utcnow() + timedelta(minutes=10),
+            verified=False,
+            attempts=attempts,
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+
+def _insert_reset_user(email: str) -> None:
+    db = TestSession()
+    try:
+        db.query(User).filter_by(email=email).delete()
+        db.commit()
+        db.add(User(
+            email=email,
+            hashed_password="$2b$12$fakehashfortest000000000000000000000000000000000000000",
+            role=UserRole.USER,
+            is_active=True,
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+
+def _confirm(client, email: str, code: str, ip: str = "127.0.0.1") -> "Response":
+    """confirm_password_reset 헬퍼 — IP별 rate limit 격리"""
+    return client.post(
+        "/api/v1/auth/password-reset/confirm",
+        json={"email": email, "code": code, "new_password": "Testpass1!"},
+        headers={"X-Forwarded-For": ip},
+    )
+
+
+class TestConfirmPasswordResetHTTP:
+    """AUTH-TC-01/02 HTTP 레벨 통합: confirm_password_reset 엔드포인트
+
+    각 테스트는 고유 X-Forwarded-For IP를 사용해 rate limit 누적을 방지합니다.
+    SQLite는 with_for_update()를 무시하므로 TOCTOU 동시성 검증은 PostgreSQL 환경에서 별도 수행합니다.
+    """
+
+    @pytest.fixture
+    def http_client(self, setup_db):
+        from api.routes.auth import limiter
+        limiter._limiter.storage.reset()
+        with TestClient(_get_auth_app(), raise_server_exceptions=False) as c:
+            yield c
+
+    def test_wrong_code_returns_400(self, http_client):
+        """잘못된 코드 입력 시 400 반환"""
+        _insert_reset_user("reset1@gsm.hs.kr")
+        _insert_reset_record("reset1@gsm.hs.kr", "123456")
+
+        with patch("api.routes.auth.now_kst", _naive_now):
+            res = _confirm(http_client, "reset1@gsm.hs.kr", "000000", ip="10.0.0.1")
+        assert res.status_code == 400
+
+    def test_attempts_increment_on_wrong_code(self, http_client):
+        """오답 입력 시 attempts DB에 증가"""
+        _insert_reset_user("reset2@gsm.hs.kr")
+        _insert_reset_record("reset2@gsm.hs.kr", "123456")
+
+        with patch("api.routes.auth.now_kst", _naive_now):
+            _confirm(http_client, "reset2@gsm.hs.kr", "000000", ip="10.0.0.2")
+
+        db = TestSession()
+        try:
+            record = db.query(EmailVerification).filter_by(
+                email="reset2@gsm.hs.kr", signup_role="password_reset"
+            ).first()
+            assert record.attempts == 1
+        finally:
+            db.close()
+
+    def test_429_after_5_attempts(self, http_client):
+        """attempts=5인 레코드 → 429 반환"""
+        _insert_reset_user("reset3@gsm.hs.kr")
+        _insert_reset_record("reset3@gsm.hs.kr", "123456", attempts=5)
+
+        with patch("api.routes.auth.now_kst", _naive_now):
+            res = _confirm(http_client, "reset3@gsm.hs.kr", "123456", ip="10.0.0.3")
+        assert res.status_code == 429
+
+    def test_correct_code_returns_200(self, http_client):
+        """올바른 코드로 비밀번호 변경 성공 — 200 반환"""
+        _insert_reset_user("reset4@gsm.hs.kr")
+        _insert_reset_record("reset4@gsm.hs.kr", "654321")
+
+        with patch("api.routes.auth.now_kst", _naive_now):
+            res = _confirm(http_client, "reset4@gsm.hs.kr", "654321", ip="10.0.0.4")
+        assert res.status_code == 200
+
+    def test_code_reuse_blocked_after_success(self, http_client):
+        """성공 후 동일 코드 재사용 시 400 반환"""
+        _insert_reset_user("reset5@gsm.hs.kr")
+        _insert_reset_record("reset5@gsm.hs.kr", "654321")
+
+        with patch("api.routes.auth.now_kst", _naive_now):
+            _confirm(http_client, "reset5@gsm.hs.kr", "654321", ip="10.0.0.5")
+            res2 = _confirm(http_client, "reset5@gsm.hs.kr", "654321", ip="10.0.0.5")
+        assert res2.status_code == 400
