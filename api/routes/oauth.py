@@ -142,7 +142,15 @@ async def oauth_callback(
         )
 
         if userinfo_res.status_code != 200:
-            logger.error(f"[OAuth] UserInfo 조회 실패: {userinfo_res.text}")
+            try:
+                err = userinfo_res.json()
+            except Exception:
+                err = {}
+            logger.error(
+                "[OAuth] UserInfo 조회 실패: status=%s error=%s",
+                userinfo_res.status_code,
+                err.get("error"),
+            )
             raise HTTPException(
                 status_code=400, detail="사용자 정보 조회에 실패했습니다."
             )
