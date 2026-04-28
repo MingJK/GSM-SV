@@ -433,7 +433,7 @@ def _insert_reset_user(email: str) -> None:
         db.close()
 
 
-def _confirm(client, email: str, code: str, ip: str = "127.0.0.1") -> "Response":
+def _confirm(client, email: str, code: str, ip: str = "127.0.0.1"):
     """confirm_password_reset 헬퍼 — IP별 rate limit 격리"""
     return client.post(
         "/api/v1/auth/password-reset/confirm",
