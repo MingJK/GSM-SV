@@ -433,19 +433,18 @@ def _insert_reset_user(email: str) -> None:
         db.close()
 
 
-def _confirm(client, email: str, code: str, ip: str = "127.0.0.1"):
-    """confirm_password_reset 헬퍼 — IP별 rate limit 격리"""
+def _confirm(client, email: str, code: str):
+    """confirm_password_reset 헬퍼 — rate limit은 http_client fixture에서 limiter.storage.reset()으로 격리"""
     return client.post(
         "/api/v1/auth/password-reset/confirm",
         json={"email": email, "code": code, "new_password": "Testpass1!"},
-        headers={"X-Forwarded-For": ip},
     )
 
 
 class TestConfirmPasswordResetHTTP:
     """AUTH-TC-01/02 HTTP 레벨 통합: confirm_password_reset 엔드포인트
 
-    각 테스트는 고유 X-Forwarded-For IP를 사용해 rate limit 누적을 방지합니다.
+    http_client fixture에서 limiter.storage.reset()으로 rate limit을 테스트 간 격리합니다.
     SQLite는 with_for_update()를 무시하므로 TOCTOU 동시성 검증은 PostgreSQL 환경에서 별도 수행합니다.
     """
 
@@ -462,7 +461,7 @@ class TestConfirmPasswordResetHTTP:
         _insert_reset_record("reset1@gsm.hs.kr", "123456")
 
         with patch("api.routes.auth.now_kst", _naive_now):
-            res = _confirm(http_client, "reset1@gsm.hs.kr", "000000", ip="10.0.0.1")
+            res = _confirm(http_client, "reset1@gsm.hs.kr", "000000")
         assert res.status_code == 400
 
     def test_attempts_increment_on_wrong_code(self, http_client):
@@ -471,7 +470,7 @@ class TestConfirmPasswordResetHTTP:
         _insert_reset_record("reset2@gsm.hs.kr", "123456")
 
         with patch("api.routes.auth.now_kst", _naive_now):
-            _confirm(http_client, "reset2@gsm.hs.kr", "000000", ip="10.0.0.2")
+            _confirm(http_client, "reset2@gsm.hs.kr", "000000")
 
         db = TestSession()
         try:
@@ -488,7 +487,7 @@ class TestConfirmPasswordResetHTTP:
         _insert_reset_record("reset3@gsm.hs.kr", "123456", attempts=5)
 
         with patch("api.routes.auth.now_kst", _naive_now):
-            res = _confirm(http_client, "reset3@gsm.hs.kr", "123456", ip="10.0.0.3")
+            res = _confirm(http_client, "reset3@gsm.hs.kr", "123456")
         assert res.status_code == 429
 
     def test_correct_code_returns_200(self, http_client):
@@ -497,7 +496,7 @@ class TestConfirmPasswordResetHTTP:
         _insert_reset_record("reset4@gsm.hs.kr", "654321")
 
         with patch("api.routes.auth.now_kst", _naive_now):
-            res = _confirm(http_client, "reset4@gsm.hs.kr", "654321", ip="10.0.0.4")
+            res = _confirm(http_client, "reset4@gsm.hs.kr", "654321")
         assert res.status_code == 200
 
     def test_code_reuse_blocked_after_success(self, http_client):
@@ -506,6 +505,6 @@ class TestConfirmPasswordResetHTTP:
         _insert_reset_record("reset5@gsm.hs.kr", "654321")
 
         with patch("api.routes.auth.now_kst", _naive_now):
-            _confirm(http_client, "reset5@gsm.hs.kr", "654321", ip="10.0.0.5")
-            res2 = _confirm(http_client, "reset5@gsm.hs.kr", "654321", ip="10.0.0.5")
+            _confirm(http_client, "reset5@gsm.hs.kr", "654321")
+            res2 = _confirm(http_client, "reset5@gsm.hs.kr", "654321")
         assert res2.status_code == 400
