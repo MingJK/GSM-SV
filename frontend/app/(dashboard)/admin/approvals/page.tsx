@@ -23,6 +23,7 @@ export default function ApprovalsPage() {
   const [requests, setRequests] = useState<PendingApproval[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<number | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -47,11 +48,12 @@ export default function ApprovalsPage() {
   const handleApprove = async (userId: number) => {
     if (actionLoading) return
     setActionLoading(userId)
+    setActionError(null)
     try {
       await approveProjectOwner(userId)
       setRequests((prev) => prev.filter((r) => r.id !== userId))
     } catch {
-      // 에러 무시
+      setActionError("승인 처리 중 오류가 발생했습니다. 다시 시도해주세요.")
     } finally {
       setActionLoading(null)
     }
@@ -61,11 +63,12 @@ export default function ApprovalsPage() {
     if (actionLoading) return
     if (!confirm("정말 거절하시겠습니까? 해당 계정이 삭제됩니다.")) return
     setActionLoading(userId)
+    setActionError(null)
     try {
       await rejectProjectOwner(userId)
       setRequests((prev) => prev.filter((r) => r.id !== userId))
     } catch {
-      // 에러 무시
+      setActionError("거절 처리 중 오류가 발생했습니다. 다시 시도해주세요.")
     } finally {
       setActionLoading(null)
     }
@@ -87,6 +90,10 @@ export default function ApprovalsPage() {
           프로젝트 오너 가입 요청을 승인하거나 거절합니다.
         </p>
       </div>
+
+      {actionError && (
+        <p className="text-sm text-destructive">{actionError}</p>
+      )}
 
       {requests.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
