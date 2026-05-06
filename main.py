@@ -10,7 +10,16 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from api.routes import vmcontrol, firewall, auth, monitoring, network, notifications, oauth, faq
+from api.routes import (
+    vmcontrol,
+    firewall,
+    auth,
+    monitoring,
+    network,
+    notifications,
+    oauth,
+    faq,
+)
 from core.config import settings
 from core.database import Base, engine, SessionLocal
 from core.init_servers import sync_servers
@@ -21,6 +30,7 @@ from models.vm_port import VmPort  # noqa: F401 — create_all 자동 반영
 
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 # Rate Limiter
@@ -39,32 +49,44 @@ async def _expire_vms_loop():
             now = now_kst()
 
             # 1. 만료된 VM 삭제
-            expired_vms = db.query(Vm).filter(
-                Vm.expires_at.isnot(None),
-                Vm.expires_at <= now,
-            ).all()
+            expired_vms = (
+                db.query(Vm)
+                .filter(
+                    Vm.expires_at.isnot(None),
+                    Vm.expires_at <= now,
+                )
+                .all()
+            )
 
             for vm in expired_vms:
                 try:
-                    logger.info(f"[expire] 만료 VM 삭제: {vm.name} (VMID {vm.hypervisor_vmid})")
+                    logger.info(
+                        f"[expire] 만료 VM 삭제: {vm.name} (VMID {vm.hypervisor_vmid})"
+                    )
                     # 만료 삭제 알림 생성
                     if vm.owner_id:
-                        db.add(Notification(
-                            user_id=vm.owner_id,
-                            type="error",
-                            message=f"VM '{vm.name}'이(가) 만료되어 자동 삭제되었습니다.",
-                        ))
+                        db.add(
+                            Notification(
+                                user_id=vm.owner_id,
+                                type="error",
+                                message=f"VM '{vm.name}'이(가) 만료되어 자동 삭제되었습니다.",
+                            )
+                        )
                         db.commit()
                     delete_vm(db, vm, purge=True)
                 except Exception as e:
                     logger.error(f"[expire] VM {vm.hypervisor_vmid} 삭제 실패: {e}")
 
             # 2. 만료 임박(15일 이내) VM 알림 (하루 1회)
-            soon_vms = db.query(Vm).filter(
-                Vm.expires_at.isnot(None),
-                Vm.expires_at > now,
-                Vm.expires_at <= now + timedelta(days=15),
-            ).all()
+            soon_vms = (
+                db.query(Vm)
+                .filter(
+                    Vm.expires_at.isnot(None),
+                    Vm.expires_at > now,
+                    Vm.expires_at <= now + timedelta(days=15),
+                )
+                .all()
+            )
 
             for vm in soon_vms:
                 if not vm.owner_id:
@@ -72,18 +94,24 @@ async def _expire_vms_loop():
                 days_left = (vm.expires_at - now).days
                 # 이미 오늘 같은 알림이 있는지 확인
                 today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                existing = db.query(Notification).filter(
-                    Notification.user_id == vm.owner_id,
-                    Notification.message.contains(vm.name),
-                    Notification.message.contains("만료까지"),
-                    Notification.created_at >= today_start,
-                ).first()
+                existing = (
+                    db.query(Notification)
+                    .filter(
+                        Notification.user_id == vm.owner_id,
+                        Notification.message.contains(vm.name),
+                        Notification.message.contains("만료까지"),
+                        Notification.created_at >= today_start,
+                    )
+                    .first()
+                )
                 if not existing:
-                    db.add(Notification(
-                        user_id=vm.owner_id,
-                        type="error",
-                        message=f"VM '{vm.name}': 만료까지 {days_left}일 남았습니다. 연장해주세요.",
-                    ))
+                    db.add(
+                        Notification(
+                            user_id=vm.owner_id,
+                            type="error",
+                            message=f"VM '{vm.name}': 만료까지 {days_left}일 남았습니다. 연장해주세요.",
+                        )
+                    )
             db.commit()
 
             # 3. 15일 지난 알림 자동 삭제
@@ -95,9 +123,13 @@ async def _expire_vms_loop():
             consecutive_failures = 0
         except Exception as e:
             consecutive_failures += 1
-            logger.error(f"[expire] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
+            logger.error(
+                f"[expire] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}"
+            )
             if consecutive_failures >= 5:
-                logger.critical(f"[expire] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
+                logger.critical(
+                    f"[expire] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요"
+                )
         finally:
             db.close()
 
@@ -111,6 +143,7 @@ async def _iptables_weekly_backup_loop():
     from models.server import Server
     from services.network_service import _backup_iptables
 
+    consecutive_failures = 0
     while True:
         db = SessionLocal()
         try:
@@ -134,9 +167,19 @@ async def _iptables_weekly_backup_loop():
                     _backup_iptables(ssh, server.gateway_ip)
                     ssh.close()
                 except Exception as e:
-                    logger.warning(f"[weekly-backup] {server.gateway_ip} 백업 실패: {e}")
+                    logger.warning(
+                        f"[weekly-backup] {server.gateway_ip} 백업 실패: {e}"
+                    )
+            consecutive_failures = 0
         except Exception as e:
-            logger.error(f"[weekly-backup] 백그라운드 태스크 오류: {e}")
+            consecutive_failures += 1
+            logger.error(
+                f"[weekly-backup] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}"
+            )
+            if consecutive_failures >= 5:
+                logger.critical(
+                    f"[weekly-backup] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요"
+                )
         finally:
             db.close()
 
@@ -157,9 +200,12 @@ async def _daily_snapshot_loop():
     consecutive_failures = 0
     while True:
         try:
+            # 실패 재시도 시 자정 대기 스킵 — 의도된 fast retry (300초 후 즉시 재실행)
             if consecutive_failures == 0:
                 now = now_kst()
-                tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                tomorrow = (now + timedelta(days=1)).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
                 wait_seconds = (tomorrow - now).total_seconds()
                 await asyncio.sleep(wait_seconds)
 
@@ -172,11 +218,19 @@ async def _daily_snapshot_loop():
                 for vm in target_vms:
                     try:
                         proxmox = get_proxmox_for_server(vm.server)
-                        snapshots = proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.get()
+                        snapshots = (
+                            proxmox.nodes(vm.server.name)
+                            .qemu(vm.hypervisor_vmid)
+                            .snapshot.get()
+                        )
                         for snap in snapshots:
                             if snap.get("name", "").startswith(AUTO_SNAP_PREFIX):
-                                proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot(snap["name"]).delete()
-                                logger.info(f"[auto-snap] 삭제: {vm.name} / {snap['name']}")
+                                proxmox.nodes(vm.server.name).qemu(
+                                    vm.hypervisor_vmid
+                                ).snapshot(snap["name"]).delete()
+                                logger.info(
+                                    f"[auto-snap] 삭제: {vm.name} / {snap['name']}"
+                                )
                     except Exception as e:
                         logger.warning(f"[auto-snap] 삭제 실패 ({vm.name}): {e}")
 
@@ -190,7 +244,9 @@ async def _daily_snapshot_loop():
                 for vm in target_vms:
                     try:
                         proxmox = get_proxmox_for_server(vm.server)
-                        proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.post(
+                        proxmox.nodes(vm.server.name).qemu(
+                            vm.hypervisor_vmid
+                        ).snapshot.post(
                             snapname=snap_name,
                             description="자동 일일 스냅샷",
                             vmstate=0,
@@ -203,15 +259,20 @@ async def _daily_snapshot_loop():
             consecutive_failures = 0
         except Exception as e:
             consecutive_failures += 1
-            logger.error(f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
+            logger.error(
+                f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}"
+            )
             if consecutive_failures >= 5:
-                logger.critical(f"[auto-snap] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
+                logger.critical(
+                    f"[auto-snap] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요"
+                )
             await asyncio.sleep(300)
 
 
 async def _oauth_store_cleanup_loop():
     """OAuth PKCE/토큰 인메모리 스토어 주기적 정리 (메모리 누수 방지)"""
     from api.routes.oauth import _cleanup_stores
+
     while True:
         try:
             _cleanup_stores()
@@ -223,8 +284,8 @@ async def _oauth_store_cleanup_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── 시작 시 ──
-    Base.metadata.create_all(bind=engine)   # 테이블 자동 생성
-    sync_servers()                          # .env → servers 테이블 동기화
+    Base.metadata.create_all(bind=engine)  # 테이블 자동 생성
+    sync_servers()  # .env → servers 테이블 동기화
 
     # 등록된 라우트 목록 출력 (디버그)
     for route in app.routes:
@@ -264,6 +325,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         content={"detail": "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."},
     )
 
+
 # CORS 설정 — settings.CORS_ORIGINS에서 허용 도메인 관리
 app.add_middleware(
     CORSMiddleware,
@@ -278,25 +340,40 @@ app.add_middleware(
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(oauth.router, prefix=f"{settings.API_V1_STR}/oauth", tags=["oauth"])
 
-app.include_router(vmcontrol.router, prefix=f"{settings.API_V1_STR}/vm", tags=["vmcontrol"])
-app.include_router(network.router, prefix=f"{settings.API_V1_STR}/network", tags=["network"])
-app.include_router(firewall.router, prefix=f"{settings.API_V1_STR}/firewall", tags=["firewall"])
-app.include_router(monitoring.router, prefix=f"{settings.API_V1_STR}/monitoring", tags=["monitoring"])
-app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["notifications"])
+app.include_router(
+    vmcontrol.router, prefix=f"{settings.API_V1_STR}/vm", tags=["vmcontrol"]
+)
+app.include_router(
+    network.router, prefix=f"{settings.API_V1_STR}/network", tags=["network"]
+)
+app.include_router(
+    firewall.router, prefix=f"{settings.API_V1_STR}/firewall", tags=["firewall"]
+)
+app.include_router(
+    monitoring.router, prefix=f"{settings.API_V1_STR}/monitoring", tags=["monitoring"]
+)
+app.include_router(
+    notifications.router,
+    prefix=f"{settings.API_V1_STR}/notifications",
+    tags=["notifications"],
+)
 app.include_router(faq.router, prefix=f"{settings.API_V1_STR}/faq", tags=["faq"])
 
 # 업로드 파일 서빙
 os.makedirs("uploads/avatars", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+
 @app.get("/")
 def read_root():
     return {
         "message": "SVC Proxmox Web Console is running",
         "status": "running",
-        "version": "1.0.0"
+        "version": "1.0.0",
     }
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8765)
