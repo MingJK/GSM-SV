@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Select,
@@ -128,7 +128,7 @@ export function MetricsTab({ instance }: { instance: Instance }) {
   const [metrics, setMetrics] = useState<VmMetricPoint[]>([])
   const [error, setError] = useState<string | null>(null)
   const { addNotification } = useNotifications()
-  const [alertSent, setAlertSent] = useState<{ cpu: boolean; mem: boolean }>({ cpu: false, mem: false })
+  const alertSentRef = useRef<{ cpu: boolean; mem: boolean }>({ cpu: false, mem: false })
 
   const fetchMetrics = useCallback(async () => {
     if (!instance.node || !instance.vmid) return
@@ -147,24 +147,24 @@ export function MetricsTab({ instance }: { instance: Instance }) {
       // 리소스 90% 초과 경고
       const latest = filtered.length > 0 ? filtered[filtered.length - 1] : null
       if (latest) {
-        if (latest.cpu > 90 && !alertSent.cpu) {
+        if (latest.cpu > 90 && !alertSentRef.current.cpu) {
           addNotification("error", `${instance.name}: CPU 사용량이 ${latest.cpu}%에 도달했습니다.`)
-          setAlertSent((prev) => ({ ...prev, cpu: true }))
+          alertSentRef.current.cpu = true
         } else if (latest.cpu <= 90) {
-          setAlertSent((prev) => ({ ...prev, cpu: false }))
+          alertSentRef.current.cpu = false
         }
-        if (latest.mem_percent > 90 && !alertSent.mem) {
+        if (latest.mem_percent > 90 && !alertSentRef.current.mem) {
           addNotification("error", `${instance.name}: 메모리 사용량이 ${latest.mem_percent}%에 도달했습니다.`)
-          setAlertSent((prev) => ({ ...prev, mem: true }))
+          alertSentRef.current.mem = true
         } else if (latest.mem_percent <= 90) {
-          setAlertSent((prev) => ({ ...prev, mem: false }))
+          alertSentRef.current.mem = false
         }
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "메트릭 조회 실패"
       setError(msg)
     }
-  }, [instance.node, instance.vmid, range, alertSent, addNotification, instance.name])
+  }, [instance.node, instance.vmid, range, addNotification, instance.name])
 
   useEffect(() => {
     if (!isRunning) return

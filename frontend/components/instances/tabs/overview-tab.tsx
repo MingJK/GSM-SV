@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Cpu, HardDrive, MemoryStick, Clock, Monitor, Calendar, User, Lock, Copy, Check, Key, Timer, Eye, EyeOff, Terminal } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -29,13 +29,19 @@ export function OverviewTab({
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [])
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text)
-    setTimeout(() => {
-      setCopiedField(field)
-      setTimeout(() => setCopiedField(null), 1500)
-    }, 100)
+    setCopiedField(field)
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    copyTimerRef.current = setTimeout(() => setCopiedField(null), 1500)
   }
 
   const createdDate = instance.created
