@@ -157,10 +157,11 @@ async def _daily_snapshot_loop():
     consecutive_failures = 0
     while True:
         try:
-            now = now_kst()
-            tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-            wait_seconds = (tomorrow - now).total_seconds()
-            await asyncio.sleep(wait_seconds)
+            if consecutive_failures == 0:
+                now = now_kst()
+                tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+                wait_seconds = (tomorrow - now).total_seconds()
+                await asyncio.sleep(wait_seconds)
 
             # ── 00:00 — 기존 auto-daily 스냅샷 삭제 ──
             logger.info("[auto-snap] 기존 자동 스냅샷 삭제 시작")
@@ -205,8 +206,7 @@ async def _daily_snapshot_loop():
             logger.error(f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
             if consecutive_failures >= 5:
                 logger.critical(f"[auto-snap] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
-            retry_interval = 300 if consecutive_failures > 0 else 3600
-            await asyncio.sleep(retry_interval)
+            await asyncio.sleep(300)
 
 
 async def _oauth_store_cleanup_loop():
