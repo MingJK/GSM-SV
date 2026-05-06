@@ -9,6 +9,7 @@ import secrets
 import time
 import httpx
 import logging
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query, Depends, Request
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -79,7 +80,7 @@ async def oauth_authorize(request: Request):
         "code_challenge": challenge,
         "code_challenge_method": "S256",
     }
-    query = "&".join(f"{k}={v}" for k, v in params.items())
+    query = urlencode(params)
     return RedirectResponse(f"{settings.DATAGSM_OAUTH_URL}/v1/oauth/authorize?{query}")
 
 
@@ -170,15 +171,14 @@ async def oauth_callback(
     if not email:
         raise HTTPException(status_code=400, detail="이메일 정보를 가져올 수 없습니다.")
 
-    # 5. 기존 유저 매칭 (이메일 기준)
-    user = (
-        db.query(User)
-        .filter(
-            User.email == email,
-            User.role == UserRole.USER,
+    # 5. 기존 유저 매칭 (이메일 기준, 역할 무관 선조회)
+    user_by_email = db.query(User).filter(User.email == email).first()
+    if user_by_email and user_by_email.role != UserRole.USER:
+        raise HTTPException(
+            status_code=409,
+            detail="해당 이메일은 다른 권한 계정으로 이미 존재합니다.",
         )
-        .first()
-    )
+    user = user_by_email
 
     if user:
         # 기존 계정에 OAuth 연결
