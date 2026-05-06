@@ -483,7 +483,7 @@ async def list_snapshots(
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
 
 
-@router.post("/{node}/vms/{vmid}/snapshots")
+@router.post("/{node}/vms/{vmid}/snapshots", status_code=status.HTTP_200_OK)
 async def create_snapshot(
     node: str,
     vmid: int,
@@ -540,7 +540,7 @@ async def rollback_snapshot(
         raise HTTPException(status_code=500, detail="스냅샷 복원에 실패했습니다.")
 
 
-@router.delete("/{node}/vms/{vmid}/snapshots/{snapname}")
+@router.delete("/{node}/vms/{vmid}/snapshots/{snapname}", status_code=status.HTTP_200_OK)
 async def delete_snapshot(
     node: str,
     vmid: int,
@@ -586,7 +586,7 @@ async def toggle_auto_snapshot(
     return {"enabled": bool(vm_record.auto_snapshot)}
 
 
-@router.delete("/{node}/vms/{vmid}")
+@router.delete("/{node}/vms/{vmid}", status_code=status.HTTP_200_OK)
 @limiter.limit("5/minute")
 async def delete_vm_endpoint(
     request: Request,

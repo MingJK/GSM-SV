@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from schemas.fw_schema import FirewallRule, VmPortCreate
@@ -33,7 +33,7 @@ async def get_firewall_rules(
         raise HTTPException(status_code=500, detail="방화벽 규칙 조회에 실패했습니다.")
 
 
-@router.post("/{vmid}/rules")
+@router.post("/{vmid}/rules", status_code=status.HTTP_201_CREATED)
 async def add_firewall_rule(
     vmid: int,
     rule: FirewallRule,
@@ -57,7 +57,7 @@ async def add_firewall_rule(
         raise HTTPException(status_code=500, detail="방화벽 규칙 추가에 실패했습니다.")
 
 
-@router.delete("/{vmid}/rules/{pos}")
+@router.delete("/{vmid}/rules/{pos}", status_code=status.HTTP_200_OK)
 async def delete_firewall_rule(
     vmid: int,
     pos: int,
@@ -236,7 +236,7 @@ async def restore_default_ports(
     return {"restored": len(missing)}
 
 
-@router.delete("/{node}/{vmid}/ports/{port_id}")
+@router.delete("/{node}/{vmid}/ports/{port_id}", status_code=status.HTTP_200_OK)
 async def delete_custom_port(
     node: str,
     vmid: int,
