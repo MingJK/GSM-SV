@@ -11,6 +11,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from api.routes import vmcontrol, firewall, auth, monitoring, network, notifications, oauth, faq
+from api.routes.oauth import validate_oauth_store_mode
 from core.config import settings
 from core.database import Base, engine, SessionLocal
 from core.init_servers import sync_servers
@@ -211,6 +212,7 @@ async def _oauth_store_cleanup_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── 시작 시 ──
+    validate_oauth_store_mode()
     Base.metadata.create_all(bind=engine)   # 테이블 자동 생성
     sync_servers()                          # .env → servers 테이블 동기화
 

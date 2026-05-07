@@ -192,7 +192,7 @@ class TestOAuthRoleConflict:
         db.add(User(email="user@gsm.hs.kr", hashed_password="x", role=UserRole.USER, is_active=True))
         db.commit()
         status = self._call_callback(oauth_client, "user@gsm.hs.kr")
-        assert status != 409
+        assert status in (200, 302, 307)
 
 
 # ── EXT-TC-05: Proxmox 연결 캐시 ─────────────────────────────

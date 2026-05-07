@@ -33,14 +33,13 @@ _token_store: dict[str, dict] = {}  # temp_code → {access, refresh, expires}
 _STORE_TTL = 300  # 5분
 
 
-def _ensure_oauth_store_mode():
+def validate_oauth_store_mode():
     if settings.OAUTH_STORE_MODE == "memory" and settings.WEB_CONCURRENCY > 1:
         logger.error(
             "[OAuth] memory store is not shared across multi-workers. Set OAUTH_STORE_MODE=redis or WEB_CONCURRENCY=1."
         )
-        raise HTTPException(
-            status_code=503,
-            detail="OAuth temporary store configuration is invalid.",
+        raise RuntimeError(
+            "OAuth memory store cannot be used with multi-workers. Configure redis store mode or set WEB_CONCURRENCY=1."
         )
 
 
@@ -72,7 +71,6 @@ def _generate_pkce() -> tuple[str, str]:
 @limiter.limit("10/minute")
 async def oauth_authorize(request: Request):
     """DataGSM OAuth 인증 시작 — 사용자를 DataGSM 로그인 페이지로 리다이렉트"""
-    _ensure_oauth_store_mode()
     state = secrets.token_urlsafe(32)
     verifier, challenge = _generate_pkce()
 
@@ -257,7 +255,6 @@ class TokenExchangeRequest(BaseModel):
 @router.post("/exchange")
 async def exchange_temp_code(body: TokenExchangeRequest):
     """임시 코드를 JWT 토큰으로 교환 (1회용) — httpOnly 쿠키에 설정"""
-    _ensure_oauth_store_mode()
     entry = _token_store.pop(body.code, None)
     if not entry or entry["expires"] < time.time():
         raise HTTPException(
