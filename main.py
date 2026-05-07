@@ -26,8 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 def _notify_admins_background_failure(task_name: str, consecutive_failures: int):
-    db = SessionLocal()
+    db = None
     try:
+        db = SessionLocal()
         admins = db.query(User).filter(User.role == UserRole.ADMIN, User.is_active == True).all()
         for admin in admins:
             db.add(Notification(
@@ -37,10 +38,12 @@ def _notify_admins_background_failure(task_name: str, consecutive_failures: int)
             ))
         db.commit()
     except Exception as notify_err:
-        db.rollback()
+        if db:
+            db.rollback()
         logger.warning(f"[{task_name}] 관리자 알림 생성 실패: {notify_err}")
     finally:
-        db.close()
+        if db:
+            db.close()
 
 # Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -120,9 +123,12 @@ async def _expire_vms_loop():
             logger.error(f"[expire] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
             if consecutive_failures >= 5 and consecutive_failures % 5 == 0:
                 logger.critical(f"[expire] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
-                await asyncio.to_thread(
-                    _notify_admins_background_failure, "expire", consecutive_failures
-                )
+                try:
+                    await asyncio.to_thread(
+                        _notify_admins_background_failure, "expire", consecutive_failures
+                    )
+                except Exception as notify_err:
+                    logger.error(f"[expire] 관리자 알림 발송 실패: {notify_err}")
         finally:
             if db:
                 db.close()
@@ -194,10 +200,19 @@ async def _daily_snapshot_loop():
 
             # ── 00:00 — 기존 auto-daily 스냅샷 삭제 ──
             logger.info("[auto-snap] 기존 자동 스냅샷 삭제 시작")
+            from sqlalchemy.orm import joinedload as _joinedload
             db = SessionLocal()
-            target_vms = db.query(Vm).filter(Vm.auto_snapshot == True).all()
+            delete_targets = (
+                db.query(Vm)
+                .options(_joinedload(Vm.server))
+                .filter(Vm.auto_snapshot == True)
+                .all()
+            )
+            db.expunge_all()
+            db.close()
+            db = None
 
-            for vm in target_vms:
+            for vm in delete_targets:
                 try:
                     proxmox = get_proxmox_for_server(vm.server)
                     snapshots = proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.get()
@@ -208,14 +223,25 @@ async def _daily_snapshot_loop():
                 except Exception as e:
                     logger.warning(f"[auto-snap] 삭제 실패 ({vm.name}): {e}")
 
-            # ── 00:10 — 새 스냅샷 생성 ──
+            # ── 00:10 — 새 스냅샷 생성 (직전 재조회) ──
             await asyncio.sleep(600)
+
+            db = SessionLocal()
+            create_targets = (
+                db.query(Vm)
+                .options(_joinedload(Vm.server))
+                .filter(Vm.auto_snapshot == True)
+                .all()
+            )
+            db.expunge_all()
+            db.close()
+            db = None
 
             today_str = now_kst().strftime("%Y%m%d")
             snap_name = f"{AUTO_SNAP_PREFIX}-{today_str}"
             logger.info(f"[auto-snap] 자동 스냅샷 생성 시작: {snap_name}")
 
-            for vm in target_vms:
+            for vm in create_targets:
                 try:
                     proxmox = get_proxmox_for_server(vm.server)
                     proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.post(
@@ -235,9 +261,12 @@ async def _daily_snapshot_loop():
             logger.error(f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
             if consecutive_failures >= 5 and consecutive_failures % 5 == 0:
                 logger.critical(f"[auto-snap] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
-                await asyncio.to_thread(
-                    _notify_admins_background_failure, "auto-snap", consecutive_failures
-                )
+                try:
+                    await asyncio.to_thread(
+                        _notify_admins_background_failure, "auto-snap", consecutive_failures
+                    )
+                except Exception as notify_err:
+                    logger.error(f"[auto-snap] 관리자 알림 발송 실패: {notify_err}")
         finally:
             if db:
                 db.close()
