@@ -114,14 +114,18 @@ async def _expire_vms_loop():
         except Exception as e:
             consecutive_failures += 1
             logger.error(f"[expire] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
-            if consecutive_failures >= 5:
+            if consecutive_failures == 5 or consecutive_failures % 10 == 0:
                 logger.critical(f"[expire] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
-                _notify_admins_background_failure("expire", consecutive_failures)
+                await asyncio.to_thread(
+                    _notify_admins_background_failure, "expire", consecutive_failures
+                )
         finally:
             db.close()
 
-        retry_interval = 300 if consecutive_failures > 0 else 3600
-        await asyncio.sleep(retry_interval)
+        if consecutive_failures > 0:
+            await asyncio.sleep(300)
+        else:
+            await asyncio.sleep(3600)
 
 
 async def _iptables_weekly_backup_loop():
@@ -223,9 +227,11 @@ async def _daily_snapshot_loop():
         except Exception as e:
             consecutive_failures += 1
             logger.error(f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
-            if consecutive_failures >= 5:
+            if consecutive_failures == 5 or consecutive_failures % 10 == 0:
                 logger.critical(f"[auto-snap] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
-                _notify_admins_background_failure("auto-snap", consecutive_failures)
+                await asyncio.to_thread(
+                    _notify_admins_background_failure, "auto-snap", consecutive_failures
+                )
             await asyncio.sleep(300)
 
 
