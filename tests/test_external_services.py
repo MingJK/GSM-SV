@@ -7,7 +7,7 @@ import threading
 import time
 import urllib.parse
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -118,6 +118,81 @@ class TestOAuthStoreConcurrency:
         with _store_lock:
             for state, _ in states:
                 _pkce_store.pop(state, None)
+
+
+# ── EXT-TC-04: ADMIN/PROJECT_OWNER 이메일 OAuth 시도 시 409 ──
+
+class TestOAuthRoleConflict:
+    """EXT-TC-04: 비USER 역할 이메일로 OAuth 콜백 시 409 반환"""
+
+    @pytest.fixture
+    def oauth_client(self):
+        from api.routes import oauth as oauth_module
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from core.database import get_db
+
+        test_app = FastAPI()
+        test_app.include_router(oauth_module.router, prefix="/api/v1/oauth")
+
+        def override_db():
+            session = TestSession()
+            try:
+                yield session
+            finally:
+                session.close()
+
+        test_app.dependency_overrides[get_db] = override_db
+        return TestClient(test_app)
+
+    def _call_callback(self, oauth_client, email: str) -> int:
+        import time
+        from api.routes.oauth import _pkce_store
+
+        state = f"test-state-{email}"
+        _pkce_store[state] = ("test-verifier", time.time() + 300)
+
+        mock_token = MagicMock()
+        mock_token.status_code = 200
+        mock_token.json.return_value = {"access_token": "fake", "refresh_token": "fake"}
+
+        mock_userinfo = MagicMock()
+        mock_userinfo.status_code = 200
+        mock_userinfo.json.return_value = {"data": {"email": email, "sub": "99", "name": "T"}}
+
+        mock_http = AsyncMock()
+        mock_http.post = AsyncMock(return_value=mock_token)
+        mock_http.get = AsyncMock(return_value=mock_userinfo)
+
+        with patch("api.routes.oauth.httpx.AsyncClient") as mock_cls:
+            mock_cls.return_value.__aenter__ = AsyncMock(return_value=mock_http)
+            mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
+            res = oauth_client.get(
+                "/api/v1/oauth/callback",
+                params={"code": "code123", "state": state},
+            )
+
+        _pkce_store.pop(state, None)
+        return res.status_code
+
+    def test_admin_email_returns_409(self, db, oauth_client):
+        """ADMIN 계정 이메일로 OAuth 시도 시 409"""
+        db.add(User(email="admin@gsm.hs.kr", hashed_password="x", role=UserRole.ADMIN, is_active=True))
+        db.commit()
+        assert self._call_callback(oauth_client, "admin@gsm.hs.kr") == 409
+
+    def test_project_owner_email_returns_409(self, db, oauth_client):
+        """PROJECT_OWNER 계정 이메일로 OAuth 시도 시 409"""
+        db.add(User(email="owner@gsm.hs.kr", hashed_password="x", role=UserRole.PROJECT_OWNER, is_active=True))
+        db.commit()
+        assert self._call_callback(oauth_client, "owner@gsm.hs.kr") == 409
+
+    def test_user_role_does_not_block_oauth(self, db, oauth_client):
+        """일반 USER 역할은 차단되지 않음 (409 아님)"""
+        db.add(User(email="user@gsm.hs.kr", hashed_password="x", role=UserRole.USER, is_active=True))
+        db.commit()
+        status = self._call_callback(oauth_client, "user@gsm.hs.kr")
+        assert status != 409
 
 
 # ── EXT-TC-05: Proxmox 연결 캐시 ─────────────────────────────
