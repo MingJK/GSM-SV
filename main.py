@@ -37,6 +37,7 @@ def _notify_admins_background_failure(task_name: str, consecutive_failures: int)
             ))
         db.commit()
     except Exception as notify_err:
+        db.rollback()
         logger.warning(f"[{task_name}] 관리자 알림 생성 실패: {notify_err}")
     finally:
         db.close()
@@ -112,9 +113,10 @@ async def _expire_vms_loop():
             db.commit()
             consecutive_failures = 0
         except Exception as e:
+            db.rollback()
             consecutive_failures += 1
             logger.error(f"[expire] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
-            if consecutive_failures == 5 or consecutive_failures % 10 == 0:
+            if consecutive_failures >= 5 and consecutive_failures % 5 == 0:
                 logger.critical(f"[expire] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
                 await asyncio.to_thread(
                     _notify_admins_background_failure, "expire", consecutive_failures
@@ -227,7 +229,7 @@ async def _daily_snapshot_loop():
         except Exception as e:
             consecutive_failures += 1
             logger.error(f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
-            if consecutive_failures == 5 or consecutive_failures % 10 == 0:
+            if consecutive_failures >= 5 and consecutive_failures % 5 == 0:
                 logger.critical(f"[auto-snap] 백그라운드 태스크 연속 {consecutive_failures}회 실패 — 점검 필요")
                 await asyncio.to_thread(
                     _notify_admins_background_failure, "auto-snap", consecutive_failures
