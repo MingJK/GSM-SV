@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # 임시 저장소 (프로덕션에서는 Redis 사용 권장)
-_pkce_store: dict[str, str] = {}  # state → code_verifier
+_pkce_store: dict[str, tuple[str, float]] = {}  # state → (code_verifier, expires_at)
 _token_store: dict[str, dict] = {}  # temp_code → {access, refresh, expires}
 _STORE_TTL = 300  # 5분
 
