@@ -195,44 +195,41 @@ async def _daily_snapshot_loop():
             # ── 00:00 — 기존 auto-daily 스냅샷 삭제 ──
             logger.info("[auto-snap] 기존 자동 스냅샷 삭제 시작")
             db = SessionLocal()
-            try:
-                target_vms = db.query(Vm).filter(Vm.auto_snapshot == True).all()
+            target_vms = db.query(Vm).filter(Vm.auto_snapshot == True).all()
 
-                for vm in target_vms:
-                    try:
-                        proxmox = get_proxmox_for_server(vm.server)
-                        snapshots = proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.get()
-                        for snap in snapshots:
-                            if snap.get("name", "").startswith(AUTO_SNAP_PREFIX):
-                                proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot(snap["name"]).delete()
-                                logger.info(f"[auto-snap] 삭제: {vm.name} / {snap['name']}")
-                    except Exception as e:
-                        logger.warning(f"[auto-snap] 삭제 실패 ({vm.name}): {e}")
+            for vm in target_vms:
+                try:
+                    proxmox = get_proxmox_for_server(vm.server)
+                    snapshots = proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.get()
+                    for snap in snapshots:
+                        if snap.get("name", "").startswith(AUTO_SNAP_PREFIX):
+                            proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot(snap["name"]).delete()
+                            logger.info(f"[auto-snap] 삭제: {vm.name} / {snap['name']}")
+                except Exception as e:
+                    logger.warning(f"[auto-snap] 삭제 실패 ({vm.name}): {e}")
 
-                # ── 00:10 — 새 스냅샷 생성 ──
-                await asyncio.sleep(600)
+            # ── 00:10 — 새 스냅샷 생성 ──
+            await asyncio.sleep(600)
 
-                today_str = now_kst().strftime("%Y%m%d")
-                snap_name = f"{AUTO_SNAP_PREFIX}-{today_str}"
-                logger.info(f"[auto-snap] 자동 스냅샷 생성 시작: {snap_name}")
+            today_str = now_kst().strftime("%Y%m%d")
+            snap_name = f"{AUTO_SNAP_PREFIX}-{today_str}"
+            logger.info(f"[auto-snap] 자동 스냅샷 생성 시작: {snap_name}")
 
-                for vm in target_vms:
-                    try:
-                        proxmox = get_proxmox_for_server(vm.server)
-                        proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.post(
-                            snapname=snap_name,
-                            description="자동 일일 스냅샷",
-                            vmstate=0,
-                        )
-                        logger.info(f"[auto-snap] 생성: {vm.name} / {snap_name}")
-                    except Exception as e:
-                        logger.warning(f"[auto-snap] 생성 실패 ({vm.name}): {e}")
-            finally:
-                db.close()
-                db = None
+            for vm in target_vms:
+                try:
+                    proxmox = get_proxmox_for_server(vm.server)
+                    proxmox.nodes(vm.server.name).qemu(vm.hypervisor_vmid).snapshot.post(
+                        snapname=snap_name,
+                        description="자동 일일 스냅샷",
+                        vmstate=0,
+                    )
+                    logger.info(f"[auto-snap] 생성: {vm.name} / {snap_name}")
+                except Exception as e:
+                    logger.warning(f"[auto-snap] 생성 실패 ({vm.name}): {e}")
+
             consecutive_failures = 0
         except Exception as e:
-            if db is not None:
+            if db:
                 db.rollback()
             consecutive_failures += 1
             logger.error(f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
@@ -241,6 +238,11 @@ async def _daily_snapshot_loop():
                 await asyncio.to_thread(
                     _notify_admins_background_failure, "auto-snap", consecutive_failures
                 )
+        finally:
+            if db:
+                db.close()
+
+        if consecutive_failures > 0:
             await asyncio.sleep(300)
 
 
