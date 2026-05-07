@@ -122,7 +122,7 @@ async def oauth_callback(
         if token_res.status_code != 200:
             try:
                 err = token_res.json()
-            except Exception:
+            except ValueError:
                 err = {}
             logger.error(
                 "[OAuth] 토큰 교환 실패: status=%s error=%s description=%s",
@@ -145,7 +145,7 @@ async def oauth_callback(
         if userinfo_res.status_code != 200:
             try:
                 err = userinfo_res.json()
-            except Exception:
+            except ValueError:
                 err = {}
             logger.error(
                 "[OAuth] UserInfo 조회 실패: status=%s error=%s",
