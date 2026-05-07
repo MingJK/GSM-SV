@@ -53,8 +53,9 @@ async def _expire_vms_loop():
 
     consecutive_failures = 0
     while True:
-        db = SessionLocal()
+        db = None
         try:
+            db = SessionLocal()
             now = now_kst()
 
             # 1. 만료된 VM 삭제
@@ -113,7 +114,8 @@ async def _expire_vms_loop():
             db.commit()
             consecutive_failures = 0
         except Exception as e:
-            db.rollback()
+            if db:
+                db.rollback()
             consecutive_failures += 1
             logger.error(f"[expire] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
             if consecutive_failures >= 5 and consecutive_failures % 5 == 0:
@@ -122,7 +124,8 @@ async def _expire_vms_loop():
                     _notify_admins_background_failure, "expire", consecutive_failures
                 )
         finally:
-            db.close()
+            if db:
+                db.close()
 
         if consecutive_failures > 0:
             await asyncio.sleep(300)
@@ -181,6 +184,7 @@ async def _daily_snapshot_loop():
 
     consecutive_failures = 0
     while True:
+        db = None
         try:
             if consecutive_failures == 0:
                 now = now_kst()
@@ -225,8 +229,11 @@ async def _daily_snapshot_loop():
                         logger.warning(f"[auto-snap] 생성 실패 ({vm.name}): {e}")
             finally:
                 db.close()
+                db = None
             consecutive_failures = 0
         except Exception as e:
+            if db is not None:
+                db.rollback()
             consecutive_failures += 1
             logger.error(f"[auto-snap] 백그라운드 태스크 오류 ({consecutive_failures}회 연속): {e}")
             if consecutive_failures >= 5 and consecutive_failures % 5 == 0:
